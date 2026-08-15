@@ -40,6 +40,8 @@ Usage:
   katafa publish free-tips [day]  select and freeze a day's free shortlist
   katafa predict [--hours N]      generate predictions for upcoming fixtures
   katafa prune payloads           drop provider_payloads older than 180 days
+  katafa revenue [--days N]       where money came from, by package/analyst/day
+  katafa payment <KTF-XXXXXXXX>   trace one MarzPay statement line to its buyer
 `)
 }
 
@@ -85,6 +87,10 @@ func run() error {
 		return predictCmd(ctx, db, log, cfg, args[1:])
 	case "prune":
 		return pruneCmd(ctx, db, log, args[1:])
+	case "revenue":
+		return revenueCmd(ctx, db, args[1:])
+	case "payment":
+		return paymentCmd(ctx, db, args[1:])
 	default:
 		usage()
 		return fmt.Errorf("unknown command %q", args[0])

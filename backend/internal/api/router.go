@@ -95,6 +95,11 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("POST /v1/admin/matches/{id}/correct", s.requireAdmin(s.handleAdminCorrectMatch))
 	mux.HandleFunc("GET /v1/admin/ingest/status", s.requireAdmin(s.handleAdminIngestStatus))
 
+	// Money: where it came from, and what a given statement line was for.
+	mux.HandleFunc("GET /v1/admin/revenue", s.requireAdmin(s.handleAdminRevenue))
+	mux.HandleFunc("GET /v1/admin/payments", s.requireAdmin(s.handleAdminPaymentLedger))
+	mux.HandleFunc("GET /v1/admin/payments/{traceCode}", s.requireAdmin(s.handleAdminPaymentTrace))
+
 	mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
 		render.Problemf(w, r, http.StatusNotFound, "not-found",
 			"Not found", "No route for %s %s", r.Method, r.URL.Path)

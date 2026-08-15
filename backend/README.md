@@ -78,6 +78,54 @@ go run ./cmd/katafa backfill -csv=E0.csv -league=eng-premier-league
 #   UPDATE leagues SET is_published = TRUE WHERE slug = 'eng-premier-league';
 ```
 
+## Tracking money
+
+Every collection carries a short **trace code** — `KTF-3F9A2B7C` — derived from
+its reference UUID. It leads the payment description, so it appears on the
+MarzPay statement, in the payer's SMS, and in the API response the buyer sees.
+
+```
+KTF-3F9A2B7C VIP slip: Saturday Banker
+```
+
+Given a line on a statement, that code resolves to the slip, the package, the
+buyer and the phone it was paid from:
+
+```bash
+go run ./cmd/katafa payment KTF-3F9A2B7C
+```
+
+Where the money came from over a period:
+
+```bash
+go run ./cmd/katafa revenue --days 30
+go run ./cmd/katafa revenue --from 2026-08-01 --to 2026-08-31
+```
+
+Same data over HTTP, admin only:
+
+```
+GET /v1/admin/revenue?from=&to=          gross/refunded/net, by package, analyst, day, network
+GET /v1/admin/payments?from=&to=         every collection attempt, for reconciling a statement
+GET /v1/admin/payments/{traceCode}       one statement line → slip and buyer
+```
+
+Three things make this reliable rather than decorative:
+
+- The trace code is a **generated column**, computed by Postgres from the same
+  reference Go derives the description from. `TestStoredTraceCodeMatchesTheOneSentToMarzPay`
+  asserts the two agree — if they ever diverged, codes read off statements
+  would silently stop resolving, and only for payments made after the change.
+- The ledger includes **failed and pending attempts**. A statement line missing
+  because it did not succeed is a line nobody can explain.
+- Refunds are reported **separately**, never netted silently. A month with
+  heavy refunds and a month with few sales look identical once netted and mean
+  very different things.
+
+Metadata sent alongside each payment carries `purchase_id`, `slip_id`,
+`user_id`, `package` and `environment` — identifiers only. No phone number, no
+email: metadata travels further than the transaction does.
+
 ## Tests
 
 ```bash

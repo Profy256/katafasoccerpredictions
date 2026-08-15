@@ -213,6 +213,7 @@ func (s *Server) paymentService() *pay.Service {
 		Provider:    s.Payments,
 		Log:         s.Log,
 		CallbackURL: s.Config.WebhookCallbackURL(),
+		Environment: string(s.Config.Env),
 	}
 }
 

@@ -136,6 +136,7 @@ func buildDeps(cfg *config.Config, db *postgres.DB, log *slog.Logger) jobs.Deps 
 			Provider:    payments,
 			Log:         log,
 			CallbackURL: cfg.WebhookCallbackURL(),
+			Environment: string(cfg.Env),
 		},
 	}
 }

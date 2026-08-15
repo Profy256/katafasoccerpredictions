@@ -105,6 +105,48 @@ already renders `HOME_SIDE` / `DRAW_SIDE` / `AWAY_SIDE`, and would label a plain
 `actual_outcome` for DC is the `*_SIDE` form. Correctness is membership either
 way, and `settle.Matches` refuses a 1X2 selection on a DC market.
 
+### A contradiction in the design documents, resolved — worth reading
+
+DATA-MODEL.md gives `purchases` this constraint:
+
+```sql
+CHECK ((status = 'paid') = (paid_at IS NOT NULL))
+```
+
+PAYMENTS.md § Refunds then sets `status = 'refunded'` on a paid purchase. That
+row still carries the `paid_at` it was given when the money arrived, so the
+check fails — **every refund would have errored at runtime.** A test caught it;
+nothing else would have until the first refund.
+
+Migration `00013` relaxes it to:
+
+```sql
+CHECK ((status IN ('paid','refunded')) = (paid_at IS NOT NULL))
+```
+
+The fix is deliberately *not* to clear `paid_at`. When the money arrived is part
+of the record, and a refund does not un-happen the payment — PAYMENTS.md itself
+says the history stays. Nulling the column to satisfy a constraint would destroy
+exactly what the constraint exists to protect.
+
+**`docs/backend/DATA-MODEL.md` still shows the original, broken constraint.**
+It was left alone rather than edited unprompted; correct it there when
+convenient, or the next person will reintroduce it.
+
+### Payment tracing
+
+Collections carry a short trace code (`KTF-3F9A2B7C`) derived from the
+reference UUID, leading the description so it survives truncation into the
+MarzPay statement and the payer's SMS. It is a **generated column** in
+`payment_transactions`, computed by Postgres from the same reference Go derives
+the description from, and a test asserts the two agree — a divergence would
+silently break statement lookups for payments made after the change, and only
+those.
+
+`GET /v1/admin/revenue`, `GET /v1/admin/payments{,/{traceCode}}`, and the
+`katafa revenue` / `katafa payment` commands read it. See
+[`backend/README.md`](backend/README.md) § Tracking money.
+
 ### Tables added beyond DATA-MODEL.md
 
 - **`prediction_voids`** — a voided prediction has no outcome, so it gets no

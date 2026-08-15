@@ -20,6 +20,9 @@ type Service struct {
 	Provider    Provider
 	Log         *slog.Logger
 	CallbackURL string
+	// Environment is stamped into payment metadata so a sandbox transaction is
+	// never mistaken for a live one when reconciling an account statement.
+	Environment string
 }
 
 // PurchaseResult is what the API returns immediately. The user's phone then
@@ -28,6 +31,10 @@ type Service struct {
 type PurchaseResult struct {
 	PurchaseID uuid.UUID `json:"purchaseId"`
 	Status     string    `json:"status"`
+	// TraceCode is the short code that appears in the payer's SMS and on the
+	// MarzPay statement. Returned so support can be given it by a user who
+	// says they paid, and match it without asking for a phone number.
+	TraceCode string `json:"traceCode"`
 }
 
 // Purchase starts a collection for one slip.
@@ -60,6 +67,7 @@ func (s *Service) Purchase(ctx context.Context, userID, slipID uuid.UUID, phone 
 	rawRequest, err := json.Marshal(map[string]any{
 		"slip_id": slipID, "user_id": userID,
 		"amount": int64(slip.PriceUGX), "phone_number": normalised,
+		"slip_title": slip.Title, "package": slip.PackageCode,
 	})
 	if err != nil {
 		return PurchaseResult{}, fmt.Errorf("encode request record: %w", err)
@@ -78,27 +86,32 @@ func (s *Service) Purchase(ctx context.Context, userID, slipID uuid.UUID, phone 
 		return PurchaseResult{}, err
 	}
 
+	// The trace code leads the description so that a line on a MarzPay
+	// statement can be tied back to a slip and a buyer without opening a
+	// support ticket.
+	traceCode := TraceCode(intent.Reference)
+
 	resp, err := s.Provider.Collect(ctx, CollectRequest{
 		Reference:   intent.Reference,
 		AmountUGX:   slip.PriceUGX,
 		PhoneNumber: normalised,
-		Description: "Katafa slip: " + slip.Title,
+		Description: CollectionDescription(intent.Reference, slip.PackageCode, slip.Title),
 		CallbackURL: s.CallbackURL,
-		Metadata: map[string]string{
-			"purchase_id": intent.PurchaseID.String(),
-			"slip_id":     slipID.String(),
-		},
+		Metadata:    CollectionMetadata(intent.PurchaseID, slipID, userID, slip.PackageCode, s.Environment),
 	})
 	if err != nil {
 		// The transaction stays 'initiated' and reconciliation will resolve
 		// it. Reporting failure here would be a guess: the gateway may well
 		// have taken the request before the connection broke.
 		s.Log.Error("collection request failed",
-			"purchase_id", intent.PurchaseID, "reference", intent.Reference, "err", err)
+			"purchase_id", intent.PurchaseID, "trace_code", traceCode,
+			"reference", intent.Reference, "err", err)
 		if len(resp.Raw) > 0 {
 			_ = s.DB.RecordCollectResponse(ctx, intent.TransactionID, "", "", "", string(TxInitiated), resp.Raw)
 		}
-		return PurchaseResult{PurchaseID: intent.PurchaseID, Status: string(TxProcessing)}, nil
+		return PurchaseResult{
+			PurchaseID: intent.PurchaseID, Status: string(TxProcessing), TraceCode: traceCode,
+		}, nil
 	}
 
 	if err := s.DB.RecordCollectResponse(ctx, intent.TransactionID,
@@ -106,7 +119,16 @@ func (s *Service) Purchase(ctx context.Context, userID, slipID uuid.UUID, phone 
 		s.Log.Error("could not record collect response", "purchase_id", intent.PurchaseID, "err", err)
 	}
 
-	return PurchaseResult{PurchaseID: intent.PurchaseID, Status: string(TxProcessing)}, nil
+	// Logged at info so the money trail is reconstructable from logs alone if
+	// the database is ever the thing in question.
+	s.Log.Info("collection requested",
+		"purchase_id", intent.PurchaseID, "trace_code", traceCode,
+		"provider_uuid", resp.ProviderUUID, "provider_txn_id", resp.ProviderTxnID,
+		"amount_ugx", int64(slip.PriceUGX), "package", slip.PackageCode, "slip_id", slipID)
+
+	return PurchaseResult{
+		PurchaseID: intent.PurchaseID, Status: string(TxProcessing), TraceCode: traceCode,
+	}, nil
 }
 
 // WebhookPayload is the subset of a callback this system reads.
