@@ -1,0 +1,69 @@
+@import "tailwindcss";
+
+/**
+ * Committed dark theme.
+ *
+ * Chart colours are not chosen by eye — the marks below were validated against
+ * the card surface (#111823) for lightness band, chroma, CVD separation and
+ * WCAG contrast. Two consequences are baked into the components:
+ *
+ *  - Magnitude charts use ONE hue (--color-brand); length carries the value.
+ *  - --color-good and --color-crit are ~4.1 ΔE apart under deuteranopia, so a
+ *    hit/miss indicator must ALWAYS pair the colour with an icon and a text
+ *    label. Never let colour alone carry the outcome.
+ */
+@theme {
+  --color-canvas: #0a0e15;
+  --color-surface: #111823;
+  --color-surface-hi: #18212e;
+  --color-line: #232e3d;
+  --color-line-soft: #1a2331;
+
+  --color-fg: #e8eef6;
+  --color-fg-muted: #93a3b8;
+  --color-fg-dim: #64748b;
+
+  /* Primary accent, and the single hue used for all magnitude charts. */
+  --color-brand: #3987e5;
+  --color-brand-deep: #1c5cab;
+  --color-brand-pale: #86b6ef;
+
+  /* Reserved status colours — never reused as a series colour. */
+  --color-good: #0ca30c;
+  --color-good-text: #5fd35f;
+  --color-crit: #d03b3b;
+  --color-crit-text: #f2a0a0;
+  --color-warn: #fab219;
+
+  --font-sans: var(--font-geist-sans), ui-sans-serif, system-ui, sans-serif;
+  --font-mono: var(--font-geist-mono), ui-monospace, monospace;
+}
+
+@layer base {
+  html {
+    color-scheme: dark;
+  }
+
+  body {
+    background-color: var(--color-canvas);
+    color: var(--color-fg);
+    font-family: var(--font-sans);
+    -webkit-font-smoothing: antialiased;
+  }
+
+  :focus-visible {
+    outline: 2px solid var(--color-brand);
+    outline-offset: 2px;
+    border-radius: 2px;
+  }
+
+  ::selection {
+    background-color: color-mix(in oklab, var(--color-brand) 35%, transparent);
+  }
+}
+
+/* Recessive gridlines: hairline, solid, one step off the surface. */
+@utility grid-line {
+  stroke: var(--color-line);
+  stroke-width: 1;
+}
