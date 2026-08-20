@@ -37,5 +37,7 @@ jobs:
           MODEL_VERSION: ${{ vars.KATAFA_MODEL_VERSION }}
           PUBLIC_BASE_URL: ${{ vars.KATAFA_PUBLIC_BASE_URL }}
           ALLOWED_ORIGINS: ${{ vars.KATAFA_ALLOWED_ORIGINS }}
+          FOOTBALL_DATA_TOKEN: ${{ secrets.FOOTBALL_DATA_TOKEN }}
+          APIFOOTBALL_KEY: ${{ secrets.APIFOOTBALL_KEY }}
           ENV: staging
         run: go run ./cmd/worker -once
