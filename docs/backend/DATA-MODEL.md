@@ -410,7 +410,10 @@ CREATE TABLE purchases (
                CHECK (status IN ('pending','paid','failed','refunded')),
     created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
     paid_at    TIMESTAMPTZ,
-    CHECK ((status = 'paid') = (paid_at IS NOT NULL))
+    -- A refunded purchase keeps the paid_at it was given when the money
+    -- arrived. Refunding does not un-happen the payment, and when it arrived
+    -- is part of the record — see PAYMENTS.md § Refunds.
+    CHECK ((status IN ('paid','refunded')) = (paid_at IS NOT NULL))
 );
 
 -- one *paid* purchase per user per slip; retries after failure stay allowed

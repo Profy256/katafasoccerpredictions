@@ -1,8 +1,12 @@
 # See https://help.github.com/articles/ignoring-files/ for more about ignoring files.
+#
+# Patterns are deliberately unanchored so they match inside frontend/ and
+# backend/ as well as at the root. The previous root-anchored forms (/node_modules,
+# /.next/) stopped matching the moment the frontend moved into its own folder.
 
 # dependencies
-/node_modules
-/.pnp
+node_modules/
+.pnp
 .pnp.*
 .yarn/*
 !.yarn/patches
@@ -11,14 +15,14 @@
 !.yarn/versions
 
 # testing
-/coverage
+coverage/
 
 # next.js
-/.next/
-/out/
+.next/
+out/
 
 # production
-/build
+build/
 
 # misc
 .DS_Store
@@ -30,8 +34,15 @@ yarn-debug.log*
 yarn-error.log*
 .pnpm-debug.log*
 
-# env files (can opt-in for committing if needed)
-.env*
+# env files
+#
+# Real secrets never get committed, but the *examples* must be, or nobody
+# knows which variables exist. The negations below are what make that work —
+# without them `.env*` swallows the templates too.
+.env
+.env.*
+!.env.example
+!.env.*.example
 
 # vercel
 .vercel
@@ -41,5 +52,8 @@ yarn-error.log*
 next-env.d.ts
 
 # Go
-/backend/bin/
+backend/bin/
 *.exe
+
+# transient staging dir used by backend/tools/parity/generate.sh
+.parity-stage.*

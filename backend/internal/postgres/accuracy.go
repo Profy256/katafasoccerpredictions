@@ -107,12 +107,17 @@ func (db *DB) AccuracySummary(ctx context.Context, modelVersion string) (domain.
 		return domain.AccuracySummary{}, err
 	}
 
+	// Every list starts empty rather than nil so it serialises as [] and not
+	// null. The frontend types all four as arrays and calls .map on them; a
+	// null here is a crash on the accuracy page, and it would only appear
+	// before the first settlement — that is, on a brand new deployment.
 	summary := domain.AccuracySummary{
-		Overall:      domain.NewAccuracyBucket("overall", "All predictions", overall.total, overall.correct),
-		ModelVersion: modelVersion,
-		ByMarket:     []domain.AccuracyBucket{},
-		ByLeague:     []domain.AccuracyBucket{},
-		Timeline:     []domain.AccuracyPoint{},
+		Overall:          domain.NewAccuracyBucket("overall", "All predictions", overall.total, overall.correct),
+		ModelVersion:     modelVersion,
+		ByMarket:         []domain.AccuracyBucket{},
+		ByLeague:         []domain.AccuracyBucket{},
+		ByConfidenceBand: []domain.AccuracyBucket{},
+		Timeline:         []domain.AccuracyPoint{},
 	}
 
 	// Empty buckets are dropped, matching the frontend's `.filter(b => b.total > 0)`:

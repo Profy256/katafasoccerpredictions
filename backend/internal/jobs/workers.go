@@ -22,14 +22,14 @@ import (
 // Deps is everything the workers need. Passed as one struct rather than
 // wired through a container: the graph is small and explicit.
 type Deps struct {
-	DB       *postgres.DB
-	Log      *slog.Logger
-	Config   *config.Config
-	Syncer   *ingest.Syncer
-	Settler  *settle.Service
+	DB        *postgres.DB
+	Log       *slog.Logger
+	Config    *config.Config
+	Syncer    *ingest.Syncer
+	Settler   *settle.Service
 	Predictor *predict.Service
 	Publisher *publish.Service
-	Payments *pay.Service
+	Payments  *pay.Service
 }
 
 // Client wraps the River client so the API can enqueue without importing

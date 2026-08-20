@@ -21,56 +21,102 @@ called out.
 |---|---|
 | 0 — Foundations | **done** — migrations apply to a clean DB, `api` serves `/readyz` |
 | 1 — Schema + invariants | **done** — every table and trigger, proven by failure tests |
-| 2 — Ingestion | **code complete, not exercised against a live provider** |
-| 3 — Model | **done** — Go/TypeScript parity verified to 1e-12 |
+| 2 — Ingestion | **code complete + fixture-tested; no live provider call has ever been made** |
+| 3 — Model | **done** — Go/TypeScript parity verified to 1e-12, regenerated in CI |
 | 4 — Settlement + accuracy | **done** — grading, voids, rollups, endpoints |
 | 5 — Free tier | **done** — selection, freeze, both endpoints |
-| 6 — Accounts + Pro reads | **code complete** — entitlement is in SQL; needs its own test |
-| 7 — MarzPay | **code complete, sandbox-untested** |
-| 8 — Frontend cutover | **not started** (deliberately last) |
+| 6 — Accounts + Pro reads | **done** — entitlement is in SQL, and now proven by test |
+| 7 — MarzPay | **code complete, sandbox-untested**; the lost-webhook guarantee is proven |
+| 8 — Frontend cutover | **done** — nothing in `src/` generates data |
 
-Verified in this build: `go build ./...` and `go vet ./...` clean; `go test ./...`
-green including the database suite; a fresh database migrated, River tables
-installed, a league seeded, and the API serving `/healthz`, `/readyz`,
-`/v1/leagues`, `/v1/markets`, `/v1/packages`, `/v1/tips/free`, `/v1/accuracy`,
-`/v1/stats/coverage`, plus the correct 400 / 404 / 401 on bad input, an unknown
-slip, and an unauthenticated `/v1/auth/me`.
+Verified in this build: `go build ./...`, `go vet ./...` and `gofmt -l .` clean;
+`go test -race ./...` green including the database suite; the parity fixture
+regenerated from the TypeScript model and byte-identical to the committed one;
+`tsc --noEmit`, `eslint` and `next build` clean.
 
-~13,000 lines of Go across 66 files, 11 migrations.
+Verified end to end against a live API and a real Postgres, through the browser:
+
+- every route renders from the API — `/`, `/accuracy`, `/fixtures`, `/pro`,
+  `/analysts`, `/analysts/[slug]`, `/matches/[id]`, `/tips/[market]`, `/login`,
+  `/pro/slips/[id]` — and unknown ids 404 rather than erroring;
+- an anonymous viewer on an **open** slip gets no selections *in the HTML at
+  all*, only the locked shell;
+- the same viewer on a **settled** slip gets every selection, including the
+  losing one;
+- register → purchase → signed webhook → the slip unlocks for that buyer, while
+  a second viewer is still locked out;
+- the trace code the API returned matched the one Postgres generated.
 
 ### What is NOT done — read this before trusting anything
 
-1. **No provider has ever been called.** Both clients are written against the
-   documented response shapes and are unit-untested. ROADMAP Phase 2 wants
-   recorded-fixture tests; there are none. Expect the first live sync to
-   surface field-shape surprises. `provider_payloads` archives every response
-   before parsing precisely so this is debuggable without burning budget.
+1. **No provider has ever been called.** Both clients now have fixture tests
+   covering the parsing rules that matter — the 90-minute score on knockout
+   ties, status vocabulary, the archive-before-parse guarantee — but the
+   fixtures in `testdata/` were built to the *documented* response shapes, not
+   captured from a live call. They cannot catch a field the documentation gets
+   wrong. Replace them with real captured responses after the first live sync;
+   `provider_payloads` archives every response before parsing precisely so that
+   costs nothing extra. The assertions should survive the swap unchanged — if
+   they do not, the shape differed, which is exactly the discovery worth making
+   cheaply.
 2. **MarzPay has never been called.** The webhook signature scheme is
    *assumed* to be HMAC-SHA256 over the raw body, read from
    `X-Marzpay-Signature` with `X-Signature` / `Signature` fallbacks. **Verify
    this against the live dashboard before going near real money.** If it is
    wrong, every callback fails verification, is recorded with
    `signature_valid = false`, and is never acted on — purchases would then
-   complete only via `reconcile_payments`, silently and slowly.
-3. **The tests ROADMAP names for phases 6 and 7 do not exist yet**: the
-   entitlement test that asserts an unpaid viewer receives *zero tip rows from
-   the database*, and the reconciliation test where the webhook is never
-   delivered. The code is written to satisfy both; nothing proves it.
-4. **`sync_competitions` is a stub.** It logs and returns. Fixture responses
+   complete only via `reconcile_payments`, silently and slowly. That path is now
+   tested (`TestLostWebhookStillCompletesThePurchase`), so it does work; it is
+   just slow and silent, which is the wrong way to find out the scheme is wrong.
+3. **`sync_competitions` is a stub.** It logs and returns. Fixture responses
    carry team ids, so teams are created on demand by `TeamIDBySource`; the
    roster job only ever existed to keep names fresh.
-5. **No CI.** The commands are in `backend/README.md`.
+4. **The ad gate still trusts the click.** `acknowledgeAdGateAction` records the
+   acknowledgement on submit rather than on an ad-network completion callback.
+   Harmless today — `ADS_ENABLED` is false, so no market is gated and the action
+   is unreachable — but it must be wired before ads go live or the gate is
+   skippable.
+5. **No live data.** The database holds whatever you seed. Nothing is published
+   until a league has `model.MinHistoryPerTeam` (40) matches per team and is
+   flipped to `is_published`.
+
+### Tests written to close phases 6 and 7
+
+- `internal/postgres/entitlement_test.go` — ROADMAP phase 6's "done when". An
+  unpaid viewer receives zero tip rows, asserted through the same `db.Slip`
+  call the handler makes, for anonymous / signed-in-never-bought / pending /
+  failed / refunded. The load-bearing part is that it first asserts the tips
+  *are* in the table, so zero rows back is the query filtering rather than an
+  empty fixture.
+- `internal/pay/service_test.go` — ROADMAP phase 7's "done when". A lost
+  webhook still completes the purchase, proven by a test that never constructs
+  one and then asserts `payment_webhook_events` is empty. Plus: duplicate
+  callbacks grant once, webhook-and-reconciliation do not double-grant, a
+  forged signature is recorded but never acted on, a late `failed` does not
+  revoke a paid purchase, and a collection that never reached the gateway is
+  recoverable and expires after 24 hours.
+- `internal/settle/settle_db_test.go` — the reschedule case INGESTION.md asked
+  for and nothing covered: a fixture moved *earlier* than the prediction that
+  was written for it is voided, with an audit entry, and is not re-voided on
+  the next pass. Also that accuracy counts every loss and no voids.
+- `internal/ingest/{footballdata,apifootball}/client_test.go` — phase 2's
+  recorded-fixture tests, with the caveat in point 1 above.
+
+The mutation check is worth repeating if you touch reconciliation: breaking
+`applyStatus` makes `TestLostWebhookStillCompletesThePurchase` fail with
+"purchase status after reconciliation = pending", which is the failure a real
+user would experience as paying and receiving nothing.
 
 ### Suggested order from here
 
-1. Recorded-fixture tests for both provider clients (Phase 2's "done when").
-   Capture real responses into `testdata/` first — one free call each.
-2. The entitlement test. It is the shortest test that protects revenue.
-3. MarzPay sandbox end-to-end, then a live low-value transaction.
-4. Phase 8 cutover: rewrite `src/api/client.ts` bodies as `fetch`, delete
-   `src/data/` and `src/lib/session.ts`, remove `DemoDataBanner`.
-
----
+1. **Verify the MarzPay webhook signature scheme against the live dashboard.**
+   This is the single highest-value unknown left, and everything about revenue
+   depends on the guess being right.
+2. Capture real provider responses into `testdata/` — one free call each — and
+   replace the hand-built fixtures.
+3. MarzPay sandbox end to end, then a live low-value transaction.
+4. Seed and backfill real leagues, let history accumulate to 40 matches per
+   team, then publish deliberately.
 
 ## Decisions taken during the build
 
@@ -129,9 +175,9 @@ of the record, and a refund does not un-happen the payment — PAYMENTS.md itsel
 says the history stays. Nulling the column to satisfy a constraint would destroy
 exactly what the constraint exists to protect.
 
-**`docs/backend/DATA-MODEL.md` still shows the original, broken constraint.**
-It was left alone rather than edited unprompted; correct it there when
-convenient, or the next person will reintroduce it.
+`docs/backend/DATA-MODEL.md` showed the original, broken constraint for a
+while. It has since been corrected to match migration `00013`, with the reason
+inline, so the next person does not reintroduce it.
 
 ### Payment tracing
 
@@ -177,6 +223,63 @@ reasonable time here. Same guarantee — real Postgres, a fresh database per tes
 dropped afterwards — via `internal/testdb`. Tests **skip** when the variable is
 unset so the pure suite runs anywhere.
 
+### The cutover: what changed shape in `src/`
+
+ROADMAP said "signatures unchanged". Two could not stay, and both for the same
+reason — they encoded decisions that have moved into the database:
+
+- **`getSlip(slipId)` lost its `ownedSlipIds` argument.** Entitlement is now a
+  `WHERE` clause in the API's query. Passing a set of owned ids from the caller
+  would mean the frontend deciding what to show, which is the fetch-then-hide
+  the paywall exists to prevent. `unlocked` now *reports* what the query
+  returned rather than deciding it.
+- **`getFreeTips(perMarket)` became `getFreeTips(date?)`.** See the traps
+  section.
+
+`getOwnedSlipIds` survives, but it now reads `GET /v1/purchases` and is only
+used to badge the slips *list*. It must never gate rendering of tips.
+
+### Where the session lives now
+
+`src/lib/session.ts` is deleted, as API.md instructed. Its three jobs went to
+three different places, deliberately:
+
+- sign-in and purchases → the API, because those cookies granted something and
+  were forgeable;
+- the ad-gate cookie → `src/lib/ad-gates.ts`, because it grants nothing. The
+  worst a forged value does is skip an advert;
+- reading the session → `getSession()` in `client.ts`, which calls
+  `GET /v1/auth/me`.
+
+The browser never talks to the API directly. `relaySessionCookie` in
+`actions.ts` copies the token across the server-to-server hop and re-states the
+cookie attributes rather than parsing them out of the `Set-Cookie` header.
+
+### `apiGet` versus `apiGetPrivate` is load-bearing
+
+`apiGet` never touches cookies, which is what keeps a route statically
+cacheable — reading cookies in a server component opts the whole route into
+dynamic rendering. `apiGetPrivate` forwards the session cookie and is always
+`no-store`.
+
+Getting that the wrong way round is not a style question: a cached response
+from a private endpoint is one viewer's paid slip served to another.
+
+### `not-found.tsx` is `force-dynamic`, on purpose
+
+The root layout reads the session to decide what the header shows. A statically
+prerendered 404 bakes in whatever that was at build time — "signed out", for
+everyone, forever. Forcing it dynamic also means `next build` no longer needs
+the API reachable just to emit that one page, which is what lets CI build
+without standing up a backend.
+
+### `KATAFA_API_URL` has no default
+
+A silent fallback to localhost in production produces a site that renders empty
+rather than one that fails loudly. It is deliberately not `NEXT_PUBLIC_`: every
+call is server-side, so the API can live on an address the browser never
+resolves.
+
 ### Secrets are only required in production
 
 `config.Load` demands provider and MarzPay credentials when `ENV=production`
@@ -187,9 +290,12 @@ real ones into a `.env` they then commit.
 
 ## Traps found while reading, worth not rediscovering
 
-- **`getFreeTips` in `src/api/client.ts` must never be ported as a read path.**
-  It re-derives the shortlist live. The backend selects once at 05:00 and
-  freezes to `free_tip_days` / `free_tips`; the API only reads those rows.
+- **`getFreeTips` must never go back to deriving the shortlist.** It is now a
+  plain read of `GET /v1/tips/free`, which reads the frozen `free_tip_days` /
+  `free_tips` rows. It also no longer takes a `perMarket` argument: how many
+  tips a market carries was decided by the publish job when it froze the day,
+  and asking for a different number on read is re-selection wearing a
+  parameter.
 - **`domain.MarketCodes` order is load-bearing.** The shortlist walks markets in
   that order and the shared per-fixture appearance cap makes the output depend
   on it. Reordering the slice changes which tips get published.
@@ -201,10 +307,11 @@ real ones into a `.env` they then commit.
   guard is in `UpsertMatch`'s `WHERE`. Corrections go through the admin path.
 - **Reschedule edge case is handled but rare:**
   `PredictionsInvalidatedByReschedule` finds picks whose match moved *earlier*
-  than the pick's own `created_at`, and voids them. INGESTION.md says to write
-  the test for it. Still unwritten.
-- **`region` gains `'asia'`.** `Region` and `REGIONS` in `src/api/types.ts` need
-  it at cutover.
+  than the pick's own `created_at`, and voids them. Now covered by
+  `TestRescheduleEarlierThanThePredictionVoidsIt`.
+- **A published slip cannot be demoted to draft.** `slips_guard_update` refuses
+  it, which is correct and caught a test of mine that took the shortcut. Seed a
+  second, genuinely-draft slip instead of unpublishing one.
 - **A draft slip returns 404, not 403**, so unpublished slip ids stay
   undiscoverable.
 - **An invalid webhook signature returns 200, not 401** — never let an attacker

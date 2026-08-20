@@ -32,14 +32,14 @@ type Config struct {
 	FootballDataToken string
 	APIFootballKey    string
 
-	MarzPayAPIUser        string
-	MarzPayAPIKey         string
-	MarzPayWebhookSecret  string
-	MarzPayBaseURL        string
-	PublicBaseURL         string
-	ModelVersion          string
-	AllowedOrigins        []string
-	LogLevel              string
+	MarzPayAPIUser       string
+	MarzPayAPIKey        string
+	MarzPayWebhookSecret string
+	MarzPayBaseURL       string
+	PublicBaseURL        string
+	ModelVersion         string
+	AllowedOrigins       []string
+	LogLevel             string
 }
 
 const defaultMarzPayBaseURL = "https://wallet.wearemarz.com/api/v1"

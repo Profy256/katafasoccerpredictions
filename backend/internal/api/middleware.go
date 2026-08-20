@@ -130,12 +130,12 @@ func (s *Server) cors(next http.Handler) http.Handler {
 // Rate limits. Public reads are limited per IP; writes per user where there is
 // one, per IP otherwise.
 const (
-	readLimit    = 300
-	readWindow   = time.Minute
-	writeLimit   = 30
-	writeWindow  = time.Minute
-	loginLimit   = 10
-	loginWindow  = 15 * time.Minute
+	readLimit   = 300
+	readWindow  = time.Minute
+	writeLimit  = 30
+	writeWindow = time.Minute
+	loginLimit  = 10
+	loginWindow = 15 * time.Minute
 )
 
 func (s *Server) rateLimit(next http.Handler) http.Handler {

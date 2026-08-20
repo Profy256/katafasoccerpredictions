@@ -378,7 +378,7 @@ func (s *Server) handleAdminCorrectMatch(w http.ResponseWriter, r *http.Request)
 	render.Status(w, http.StatusOK, map[string]any{
 		"id":                 matchID,
 		"predictionsFlagged": flagged,
-		"note": "Existing results are unchanged. Flagged predictions need a published correction.",
+		"note":               "Existing results are unchanged. Flagged predictions need a published correction.",
 	})
 }
 
@@ -394,7 +394,7 @@ func (s *Server) handleAdminIngestStatus(w http.ResponseWriter, r *http.Request)
 		return
 	}
 	render.Status(w, http.StatusOK, map[string]any{
-		"providers":              status,
-		"openCorrectionReviews":  len(reviews),
+		"providers":             status,
+		"openCorrectionReviews": len(reviews),
 	})
 }

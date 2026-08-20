@@ -1,0 +1,157 @@
+{
+  "get": "fixtures",
+  "parameters": { "league": "292", "season": "2025", "from": "2026-03-01", "to": "2026-03-08", "timezone": "UTC" },
+  "errors": [],
+  "results": 6,
+  "paging": { "current": 1, "total": 1 },
+  "response": [
+    {
+      "fixture": {
+        "id": 1215501,
+        "referee": "J. Ssemujju",
+        "timezone": "UTC",
+        "date": "2026-03-01T15:00:00+00:00",
+        "timestamp": 1772377200,
+        "periods": { "first": 1772377200, "second": 1772380800 },
+        "venue": { "id": 1120, "name": "Mandela National Stadium", "city": "Kampala" },
+        "status": { "long": "Match Finished", "short": "FT", "elapsed": 90 }
+      },
+      "league": {
+        "id": 292, "name": "Uganda Premier League", "country": "Uganda",
+        "season": 2025, "round": "Regular Season - 22"
+      },
+      "teams": {
+        "home": { "id": 5301, "name": "KCCA FC", "winner": true },
+        "away": { "id": 5304, "name": "Vipers SC", "winner": false }
+      },
+      "goals": { "home": 2, "away": 1 },
+      "score": {
+        "halftime": { "home": 1, "away": 0 },
+        "fulltime": { "home": 2, "away": 1 },
+        "extratime": { "home": null, "away": null },
+        "penalty": { "home": null, "away": null }
+      }
+    },
+    {
+      "fixture": {
+        "id": 1215502,
+        "timezone": "UTC",
+        "date": "2026-03-03T18:00:00+00:00",
+        "timestamp": 1772560800,
+        "venue": { "id": 1121, "name": "St Mary's Stadium", "city": "Kitende" },
+        "status": { "long": "Match Finished After Extra Time", "short": "AET", "elapsed": 120 }
+      },
+      "league": {
+        "id": 292, "name": "Uganda Cup", "country": "Uganda",
+        "season": 2025, "round": "Quarter-finals"
+      },
+      "teams": {
+        "home": { "id": 5302, "name": "SC Villa", "winner": false },
+        "away": { "id": 5303, "name": "Express FC", "winner": true }
+      },
+      "goals": { "home": 1, "away": 2 },
+      "score": {
+        "halftime": { "home": 1, "away": 0 },
+        "fulltime": { "home": 1, "away": 1 },
+        "extratime": { "home": 0, "away": 1 },
+        "penalty": { "home": null, "away": null }
+      }
+    },
+    {
+      "fixture": {
+        "id": 1215503,
+        "timezone": "UTC",
+        "date": "2026-03-04T18:00:00+00:00",
+        "timestamp": 1772647200,
+        "status": { "long": "Match Finished After Penalties", "short": "PEN", "elapsed": 120 }
+      },
+      "league": {
+        "id": 292, "name": "Uganda Cup", "country": "Uganda",
+        "season": 2025, "round": "Semi-finals"
+      },
+      "teams": {
+        "home": { "id": 5305, "name": "BUL FC", "winner": true },
+        "away": { "id": 5306, "name": "URA FC", "winner": false }
+      },
+      "goals": { "home": 0, "away": 0 },
+      "score": {
+        "halftime": { "home": 0, "away": 0 },
+        "fulltime": { "home": 0, "away": 0 },
+        "extratime": { "home": 0, "away": 0 },
+        "penalty": { "home": 4, "away": 3 }
+      }
+    },
+    {
+      "fixture": {
+        "id": 1215504,
+        "timezone": "UTC",
+        "date": "2026-03-07T15:00:00+00:00",
+        "timestamp": 1772895600,
+        "status": { "long": "Not Started", "short": "NS", "elapsed": null }
+      },
+      "league": {
+        "id": 292, "name": "Uganda Premier League", "country": "Uganda",
+        "season": 2025, "round": "Regular Season - 23"
+      },
+      "teams": {
+        "home": { "id": 5307, "name": "Police FC", "winner": null },
+        "away": { "id": 5301, "name": "KCCA FC", "winner": null }
+      },
+      "goals": { "home": null, "away": null },
+      "score": {
+        "halftime": { "home": null, "away": null },
+        "fulltime": { "home": null, "away": null },
+        "extratime": { "home": null, "away": null },
+        "penalty": { "home": null, "away": null }
+      }
+    },
+    {
+      "fixture": {
+        "id": 1215505,
+        "timezone": "UTC",
+        "date": "2026-03-07T18:00:00+00:00",
+        "timestamp": 1772906400,
+        "status": { "long": "Match Postponed", "short": "PST", "elapsed": null }
+      },
+      "league": {
+        "id": 292, "name": "Uganda Premier League", "country": "Uganda",
+        "season": 2025, "round": "Regular Season - 23"
+      },
+      "teams": {
+        "home": { "id": 5304, "name": "Vipers SC", "winner": null },
+        "away": { "id": 5302, "name": "SC Villa", "winner": null }
+      },
+      "goals": { "home": null, "away": null },
+      "score": {
+        "halftime": { "home": null, "away": null },
+        "fulltime": { "home": null, "away": null },
+        "extratime": { "home": null, "away": null },
+        "penalty": { "home": null, "away": null }
+      }
+    },
+    {
+      "fixture": {
+        "id": 1215506,
+        "timezone": "UTC",
+        "date": "2026-03-08T15:00:00+00:00",
+        "timestamp": 1772982000,
+        "status": { "long": "Match Abandoned", "short": "ABD", "elapsed": 63 }
+      },
+      "league": {
+        "id": 292, "name": "Uganda Premier League", "country": "Uganda",
+        "season": 2025, "round": "Regular Season - 23"
+      },
+      "teams": {
+        "home": { "id": 5303, "name": "Express FC", "winner": null },
+        "away": { "id": 5305, "name": "BUL FC", "winner": null }
+      },
+      "goals": { "home": 1, "away": 0 },
+      "score": {
+        "halftime": { "home": 1, "away": 0 },
+        "fulltime": { "home": null, "away": null },
+        "extratime": { "home": null, "away": null },
+        "penalty": { "home": null, "away": null }
+      }
+    }
+  ]
+}

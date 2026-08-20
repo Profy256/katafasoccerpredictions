@@ -81,7 +81,7 @@ func (s *Server) handleAdminPaymentLedger(w http.ResponseWriter, r *http.Request
 func parseWindow(r *http.Request, defaultDays int) (time.Time, time.Time, error) {
 	query := r.URL.Query()
 
-	to := time.Now().UTC().Truncate(24 * time.Hour).AddDate(0, 0, 1)
+	to := time.Now().UTC().Truncate(24*time.Hour).AddDate(0, 0, 1)
 	from := to.AddDate(0, 0, -defaultDays)
 
 	if raw := query.Get("from"); raw != "" {

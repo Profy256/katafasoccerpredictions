@@ -1,0 +1,33 @@
+{
+  "get": "teams",
+  "parameters": { "league": "292", "season": "2025" },
+  "errors": [],
+  "results": 3,
+  "paging": { "current": 1, "total": 1 },
+  "response": [
+    {
+      "team": {
+        "id": 5301, "name": "KCCA FC", "code": "KCC", "country": "Uganda",
+        "founded": 1963, "national": false,
+        "logo": "https://media.api-sports.io/football/teams/5301.png"
+      },
+      "venue": { "id": 1120, "name": "Mandela National Stadium", "city": "Kampala", "capacity": 45202 }
+    },
+    {
+      "team": {
+        "id": 5304, "name": "Vipers SC", "code": "VIP", "country": "Uganda",
+        "founded": 1968, "national": false,
+        "logo": "https://media.api-sports.io/football/teams/5304.png"
+      },
+      "venue": { "id": 1121, "name": "St Mary's Stadium", "city": "Kitende", "capacity": 25000 }
+    },
+    {
+      "team": {
+        "id": 5308, "name": "Kitara FC", "code": null, "country": "Uganda",
+        "founded": 2010, "national": false,
+        "logo": "https://media.api-sports.io/football/teams/5308.png"
+      },
+      "venue": { "id": 1122, "name": "Masindi Stadium", "city": "Masindi", "capacity": 5000 }
+    }
+  ]
+}

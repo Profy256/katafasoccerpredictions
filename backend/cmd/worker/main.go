@@ -7,6 +7,7 @@ package main
 
 import (
 	"context"
+	"flag"
 	"fmt"
 	"log/slog"
 	"os"
@@ -40,6 +41,11 @@ func main() {
 }
 
 func run() error {
+	once := flag.Bool("once", false, "run every job directly, once, and exit — no River, "+
+		"no persistent process. For driving the worker from an external scheduler "+
+		"(e.g. a GitHub Actions cron) instead of an always-on machine.")
+	flag.Parse()
+
 	cfg, err := config.Load()
 	if err != nil {
 		return err
@@ -56,6 +62,15 @@ func run() error {
 	defer db.Close()
 
 	deps := buildDeps(cfg, db, log)
+
+	if *once {
+		log.Info("worker tick starting", "env", cfg.Env)
+		if err := runOnce(ctx, deps, log); err != nil {
+			return fmt.Errorf("tick: %w", err)
+		}
+		log.Info("worker tick done")
+		return nil
+	}
 
 	workers := river.NewWorkers()
 	jobs.Register(workers, deps)

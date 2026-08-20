@@ -22,9 +22,9 @@ import (
 // Server carries the handler dependencies. A plain struct rather than a DI
 // container: the dependency graph is small and explicit.
 type Server struct {
-	DB      *postgres.DB
-	Log     *slog.Logger
-	Config  *config.Config
+	DB       *postgres.DB
+	Log      *slog.Logger
+	Config   *config.Config
 	Payments pay.Provider
 	// Enqueue hands work to River. Nil in tests that do not exercise the
 	// asynchronous paths.

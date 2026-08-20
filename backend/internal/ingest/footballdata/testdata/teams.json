@@ -1,0 +1,36 @@
+{
+  "count": 3,
+  "filters": { "season": "2025" },
+  "competition": { "id": 2021, "name": "Premier League", "code": "PL" },
+  "season": { "id": 1564, "startDate": "2025-08-15", "endDate": "2026-05-24" },
+  "teams": [
+    {
+      "id": 65,
+      "name": "Manchester City FC",
+      "shortName": "Man City",
+      "tla": "MCI",
+      "crest": "https://crests.football-data.org/65.png",
+      "address": "SportCity Manchester M11 3FF",
+      "founded": 1880,
+      "venue": "Etihad Stadium"
+    },
+    {
+      "id": 61,
+      "name": "Chelsea FC",
+      "shortName": "Chelsea",
+      "tla": "CHE",
+      "crest": "https://crests.football-data.org/61.png",
+      "founded": 1905,
+      "venue": "Stamford Bridge"
+    },
+    {
+      "id": 402,
+      "name": "Brentford FC",
+      "shortName": "",
+      "tla": "BRE",
+      "crest": "https://crests.football-data.org/402.png",
+      "founded": 1889,
+      "venue": "Gtech Community Stadium"
+    }
+  ]
+}

@@ -1,0 +1,51 @@
+{
+  "count": 3,
+  "filters": {},
+  "competitions": [
+    {
+      "id": 2021,
+      "area": { "id": 2072, "name": "England", "code": "ENG", "flag": null },
+      "name": "Premier League",
+      "code": "PL",
+      "type": "LEAGUE",
+      "emblem": "https://crests.football-data.org/PL.png",
+      "plan": "TIER_ONE",
+      "currentSeason": {
+        "id": 1564,
+        "startDate": "2025-08-15",
+        "endDate": "2026-05-24",
+        "currentMatchday": 28
+      },
+      "numberOfAvailableSeasons": 34,
+      "lastUpdated": "2026-03-01T00:00:00Z"
+    },
+    {
+      "id": 2014,
+      "area": { "id": 2224, "name": "Spain", "code": "ESP", "flag": null },
+      "name": "Primera Division",
+      "code": "PD",
+      "type": "LEAGUE",
+      "plan": "TIER_ONE",
+      "currentSeason": {
+        "id": 1577,
+        "startDate": "2025-08-16",
+        "endDate": "2026-05-24",
+        "currentMatchday": 27
+      }
+    },
+    {
+      "id": 2013,
+      "area": { "id": 2032, "name": "Brazil", "code": "BRA", "flag": null },
+      "name": "Campeonato Brasileiro Série A",
+      "code": "BSA",
+      "type": "LEAGUE",
+      "plan": "TIER_ONE",
+      "currentSeason": {
+        "id": 1598,
+        "startDate": "2026-04-11",
+        "endDate": "2026-12-06",
+        "currentMatchday": 1
+      }
+    }
+  ]
+}

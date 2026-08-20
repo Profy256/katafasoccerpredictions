@@ -1,0 +1,42 @@
+{
+  "get": "leagues",
+  "parameters": { "current": "true" },
+  "errors": [],
+  "results": 2,
+  "paging": { "current": 1, "total": 1 },
+  "response": [
+    {
+      "league": {
+        "id": 292,
+        "name": "Uganda Premier League",
+        "type": "League",
+        "logo": "https://media.api-sports.io/football/leagues/292.png"
+      },
+      "country": {
+        "name": "Uganda",
+        "code": "UG",
+        "flag": "https://media.api-sports.io/flags/ug.svg"
+      },
+      "seasons": [
+        { "year": 2024, "start": "2024-09-13", "end": "2025-05-31", "current": false },
+        { "year": 2025, "start": "2025-09-12", "end": "2026-05-30", "current": true }
+      ]
+    },
+    {
+      "league": {
+        "id": 12,
+        "name": "CAF Champions League",
+        "type": "Cup",
+        "logo": "https://media.api-sports.io/football/leagues/12.png"
+      },
+      "country": {
+        "name": "World",
+        "code": null,
+        "flag": null
+      },
+      "seasons": [
+        { "year": 2025, "start": "2025-08-15", "end": "2026-05-30", "current": true }
+      ]
+    }
+  ]
+}

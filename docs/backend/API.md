@@ -17,10 +17,12 @@ verbatim, camelCase, so the frontend swap is a change of transport only.
 | `getAccuracySummary` | `GET /accuracy` | — | `max-age=900` |
 | `getSettledPredictions` | `GET /predictions/settled` | — | `max-age=900` |
 | `getFreeTips` | `GET /tips/free` | — | `max-age=600` |
-| — *(new)* | `GET /tips/free/history` | — | `max-age=3600` |
+| `getFreeTipsHistory` | `GET /tips/free/history` | — | `max-age=3600` |
 | `getPackages` | `GET /packages` | — | `max-age=3600` |
 | `getSlips` | `GET /slips` | optional | `no-store` |
 | `getSlip` | `GET /slips/{id}` | optional | `private, no-store` |
+| `getSession` | `GET /auth/me` | required | `no-store` |
+| `getPurchases` | `GET /purchases` | required | `no-store` |
 | `getAnalysts` | `GET /analysts` | — | `max-age=3600` |
 | `getAnalystRecord` | `GET /analysts/{slug}` | — | `max-age=900` |
 | `getAnalystLeaderboard` | `GET /analysts/leaderboard` | — | `max-age=900` |
@@ -47,7 +49,7 @@ Pagination is cursor-based (opaque, encodes `(sort_key, id)`) on the two
 endpoints that grow without bound: `/predictions/settled` and `/slips`. Offset
 pagination over a table that gains rows daily shows duplicates across pages.
 
-## The endpoint the frontend does not have yet
+## The free-tips history endpoint
 
 ```
 GET /tips/free/history?from=2026-08-01&to=2026-08-13
@@ -57,8 +59,8 @@ GET /tips/free/history?from=2026-08-01&to=2026-08-13
 
 Serving "yesterday's free tips went 4 from 5" needs the frozen shortlist joined
 to `prediction_results`. It reads `free_tips`, never a live re-selection — see
-[SETTLEMENT.md](SETTLEMENT.md#why-the-free-shortlist-is-frozen). Add the matching
-function to `client.ts` when this lands.
+[SETTLEMENT.md](SETTLEMENT.md#why-the-free-shortlist-is-frozen). `client.ts`
+exposes it as `getFreeTipsHistory`.
 
 ## Auth
 
@@ -74,8 +76,11 @@ cookie, sha256-hashed in `sessions`. Login is rate-limited per email *and* per
 IP — per IP alone lets a botnet spray one account, per email alone lets one IP
 enumerate accounts.
 
-Replaces `src/lib/session.ts` entirely. That file's cookies are forgeable by
-anyone and it says so; delete it rather than adapting it.
+This replaced `src/lib/session.ts` entirely — that file's cookies were forgeable
+by anyone and said so, and it was deleted rather than adapted. `getSession()` in
+`client.ts` calls `GET /auth/me`; the browser never talks to this API directly,
+so `relaySessionCookie` in `src/app/actions.ts` copies the token across the
+server-to-server hop.
 
 ## Purchases
 

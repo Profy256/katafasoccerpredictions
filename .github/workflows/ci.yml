@@ -1,0 +1,162 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+# A second push to the same branch cancels the first: the older run's result is
+# about to be irrelevant, and the database suite is not free.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  backend:
+    name: Backend
+    runs-on: ubuntu-latest
+
+    # The repository tests run against real Postgres because the invariants are
+    # enforced by triggers and constraints. A mocked database would test
+    # nothing that matters: the suite has to be able to assert that inserting a
+    # post-kickoff prediction *fails*, and only Postgres can say so.
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: katafa
+          POSTGRES_PASSWORD: katafa
+          POSTGRES_DB: katafa
+        ports:
+          - 5433:5432
+        options: >-
+          --health-cmd "pg_isready -U katafa"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: backend/go.mod
+          cache-dependency-path: backend/go.sum
+
+      - name: Build
+        working-directory: backend
+        run: go build ./...
+
+      - name: Vet
+        working-directory: backend
+        run: go vet ./...
+
+      - name: Check formatting
+        working-directory: backend
+        run: |
+          unformatted=$(gofmt -l .)
+          if [ -n "$unformatted" ]; then
+            echo "These files need gofmt:"
+            echo "$unformatted"
+            exit 1
+          fi
+
+      # Without TEST_DATABASE_URL the database tests skip rather than fail, so
+      # the suite runs anywhere. CI is the place that must not let them skip —
+      # hence the guard below.
+      - name: Test
+        working-directory: backend
+        env:
+          TEST_DATABASE_URL: postgres://katafa:katafa@localhost:5433/katafa?sslmode=disable
+        run: go test -race ./...
+
+      - name: Assert the database suite actually ran
+        working-directory: backend
+        env:
+          TEST_DATABASE_URL: postgres://katafa:katafa@localhost:5433/katafa?sslmode=disable
+        run: |
+          # A silently skipped suite is worse than a failing one: the paywall
+          # and settlement tests would report green having asserted nothing.
+          go test -run TestUnpaidViewerReceivesZeroTipRows -v ./internal/postgres/ 2>&1 | tee /tmp/entitlement.log
+          if grep -q -- '--- SKIP' /tmp/entitlement.log; then
+            echo "The entitlement test skipped. Postgres was not reachable."
+            exit 1
+          fi
+          grep -q -- '--- PASS: TestUnpaidViewerReceivesZeroTipRows' /tmp/entitlement.log
+
+  frontend:
+    name: Frontend
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Install
+        working-directory: frontend
+        run: npm ci
+
+      - name: Typecheck
+        working-directory: frontend
+        run: npx tsc --noEmit
+
+      - name: Lint
+        working-directory: frontend
+        run: npm run lint
+
+      # No API is running here, and none is needed: every data route renders on
+      # demand, so the build compiles and typechecks without reaching one.
+      - name: Build
+        working-directory: frontend
+        run: npm run build
+
+  model-parity:
+    name: Model parity
+    runs-on: ubuntu-latest
+
+    # The Go port and the TypeScript model must produce identical numbers. The
+    # fixture is regenerated from the TypeScript source here rather than
+    # trusted from the repository, so a stale fixture cannot hide a divergence
+    # that has already happened.
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: backend/go.mod
+          cache-dependency-path: backend/go.sum
+
+      - name: Install
+        working-directory: frontend
+        run: npm ci
+
+      - name: Regenerate the parity fixture from the TypeScript model
+        run: ./backend/tools/parity/generate.sh
+
+      - name: Diff the Go port against it
+        working-directory: backend
+        run: go test ./internal/model/...
+
+      - name: Fail if the committed fixture was stale
+        run: |
+          # The regenerated fixture must match what is in the repository. If it
+          # does not, the TypeScript model changed without the fixture being
+          # regenerated, and the parity test above has been comparing the Go
+          # port against a snapshot of an older model.
+          if ! git diff --quiet -- backend/internal/model/testdata/parity.json; then
+            echo "backend/internal/model/testdata/parity.json is out of date."
+            echo "Regenerate it — see backend/tools/parity/README.md."
+            git diff --stat -- backend/internal/model/testdata/parity.json
+            exit 1
+          fi
