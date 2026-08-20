@@ -1,0 +1,41 @@
+name: Worker tick
+
+# Drives the backend worker jobs (ingestion, prediction, the 05:00 free-tips
+# freeze, settlement, payment reconciliation) on a schedule instead of an
+# always-on process — no free hosting tier offers one, and cmd/worker -once
+# runs every job directly and exits (see backend/cmd/worker/tick.go).
+#
+# Every job it calls is idempotent by design, so a late or doubled tick is
+# harmless — this is what makes a 15-minute external cron a safe substitute
+# for River's own scheduler.
+
+on:
+  schedule:
+    - cron: "*/15 * * * *"
+  workflow_dispatch: {}
+
+concurrency:
+  group: worker-tick
+  cancel-in-progress: false
+
+jobs:
+  tick:
+    name: Run worker tick
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: backend/go.mod
+
+      - name: Run worker -once
+        working-directory: backend
+        env:
+          DATABASE_URL: ${{ secrets.KATAFA_DATABASE_URL }}
+          MODEL_VERSION: ${{ vars.KATAFA_MODEL_VERSION }}
+          PUBLIC_BASE_URL: ${{ vars.KATAFA_PUBLIC_BASE_URL }}
+          ALLOWED_ORIGINS: ${{ vars.KATAFA_ALLOWED_ORIGINS }}
+          ENV: staging
+        run: go run ./cmd/worker -once
