@@ -3,6 +3,7 @@ import { notFound, redirect } from 'next/navigation';
 import { getAnalysts, getMarkets, getSlip, requireAdminSession } from '@/api/client';
 import { Shell } from '@/components/Shell';
 import { AddTipForm } from '@/components/AddTipForm';
+import { BulkAddTipsForm } from '@/components/BulkAddTipsForm';
 import { deleteSlipAction, publishSlipAction } from '@/app/actions';
 import { formatDateTime, formatUGX } from '@/lib/format';
 
@@ -94,6 +95,18 @@ export default async function SlipDetailPage({ params, searchParams }: PageProps
             markets={markets}
             nextPosition={slip.tips.length + 1}
           />
+        </section>
+      )}
+
+      {draft && (
+        <section className="mt-6">
+          <h2 className="text-sm font-medium text-fg-muted">Paste many at once</h2>
+          <p className="mt-1 text-xs text-fg-dim">
+            One match per line, in whatever shape you already have it — team names, market,
+            selection, odds, kickoff, in any order. Nothing is added until you check the preview
+            below and fix anything it got wrong.
+          </p>
+          <BulkAddTipsForm slipId={slip.id} analysts={analysts} nextPosition={slip.tips.length + 1} />
         </section>
       )}
 

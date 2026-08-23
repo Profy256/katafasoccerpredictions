@@ -83,6 +83,35 @@ export async function signOutAction() {
   redirect('/login');
 }
 
+export async function createAnalystAction(formData: FormData) {
+  const name = readString(formData, 'name');
+  const handle = readString(formData, 'handle');
+  const initials = readString(formData, 'initials');
+  const bio = readString(formData, 'bio');
+
+  try {
+    await apiSend('POST', '/v1/admin/analysts', { name, handle, initials, bio });
+  } catch (error) {
+    redirectWithError('/analysts', error);
+  }
+
+  revalidatePath('/analysts');
+  redirect('/analysts');
+}
+
+export async function deactivateAnalystAction(formData: FormData) {
+  const analystId = readString(formData, 'analystId');
+
+  try {
+    await apiSend('DELETE', `/v1/admin/analysts/${encodeURIComponent(analystId)}`);
+  } catch (error) {
+    redirectWithError('/analysts', error);
+  }
+
+  revalidatePath('/analysts');
+  redirect('/analysts');
+}
+
 export async function createSlipAction(formData: FormData) {
   const packageCode = readString(formData, 'packageCode');
   const title = readString(formData, 'title');
@@ -137,6 +166,48 @@ export async function addTipAction(formData: FormData) {
       position: Number(position),
       ...(structured ? { matchId, marketType, selectionValue } : {}),
       ...(note ? { note } : {}),
+    });
+  } catch (error) {
+    redirectWithError(`/slips/${slipId}`, error);
+  }
+
+  revalidatePath(`/slips/${slipId}`);
+  redirect(`/slips/${slipId}`);
+}
+
+interface BulkTipInput {
+  fixtureLabel: string;
+  marketLabel: string;
+  selectionLabel: string;
+  odds: string;
+  kickoffAt: string;
+  note?: string;
+}
+
+export async function bulkAddTipsAction(formData: FormData) {
+  const slipId = readString(formData, 'slipId');
+  const analystId = readString(formData, 'analystId');
+  const raw = readString(formData, 'tipsJson');
+
+  let tips: BulkTipInput[];
+  try {
+    tips = JSON.parse(raw || '[]');
+  } catch {
+    redirectWithError(`/slips/${slipId}`, new Error('Could not read the pasted tips'));
+    return;
+  }
+
+  try {
+    await apiSend('POST', `/v1/admin/slips/${encodeURIComponent(slipId)}/tips/bulk`, {
+      analystId,
+      tips: tips.map((t) => ({
+        fixtureLabel: t.fixtureLabel,
+        marketLabel: t.marketLabel,
+        selectionLabel: t.selectionLabel,
+        odds: t.odds,
+        kickoffAt: new Date(t.kickoffAt).toISOString(),
+        ...(t.note ? { note: t.note } : {}),
+      })),
     });
   } catch (error) {
     redirectWithError(`/slips/${slipId}`, error);

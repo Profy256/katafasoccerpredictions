@@ -100,13 +100,29 @@ All under `/admin`, all require `role = 'admin'`, all write `audit_log`.
 ```
 POST   /admin/slips                    create a draft
 POST   /admin/slips/{id}/tips          add a tip to a draft
+POST   /admin/slips/{id}/tips/bulk     add many tips to a draft in one transaction
 POST   /admin/slips/{id}/publish       draft → open; validates every kickoff is future
 DELETE /admin/slips/{id}               only while draft
 POST   /admin/tips/{id}/settle         { wasCorrect, actualOutcome, reason }
 POST   /admin/matches/{id}/correct     { homeScore, awayScore, reason }
 POST   /admin/predictions/publish      force a generation run
 GET    /admin/ingest/status            per-provider budget, last sync, gaps
+POST   /admin/analysts                 { name, handle, initials, bio } — name one, once
+DELETE /admin/analysts/{id}            deactivate; existing slips and tips are untouched
 ```
+
+`POST /admin/analysts` and `DELETE /admin/analysts/{id}` are the only writes
+against the `analysts` table. An analyst is named once here and picked by id
+everywhere else a slip or tip needs one — there is no per-slip re-entry, and no
+reactivation path once deactivated.
+
+`POST /admin/slips/{id}/tips/bulk` is `POST /admin/slips/{id}/tips` repeated
+in one transaction — same free-text-only shape (no `matchId`/`marketType`/
+`selectionValue`; bulk tips are always settled by hand), same per-tip
+validation, all-or-nothing. Positions are assigned sequentially after
+whatever is already on the slip. The admin UI parses a pasted block of text
+into this shape client-side and shows an editable preview before sending it —
+the endpoint itself trusts nothing about where the text came from.
 
 `POST /admin/slips/{id}/publish` refuses if any tip's `kickoff_at` has passed.
 Publishing a slip containing a started match is the exact shape of the fraud the

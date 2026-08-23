@@ -77,6 +77,12 @@ export default async function DashboardPage() {
           Manage slips →
         </Link>
         <Link
+          href="/analysts"
+          className="rounded-lg border border-line px-3 py-2 text-sm hover:border-brand"
+        >
+          Analysts →
+        </Link>
+        <Link
           href="/revenue"
           className="rounded-lg border border-line px-3 py-2 text-sm hover:border-brand"
         >

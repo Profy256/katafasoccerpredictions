@@ -100,6 +100,90 @@ func (s *Server) handleAdminCreateSlip(w http.ResponseWriter, r *http.Request) {
 	render.Status(w, http.StatusCreated, map[string]any{"id": slipID, "status": domain.SlipDraft})
 }
 
+type createAnalystRequest struct {
+	Name     string `json:"name"`
+	Handle   string `json:"handle"`
+	Initials string `json:"initials"`
+	Bio      string `json:"bio"`
+}
+
+// handleAdminCreateAnalyst names a new analyst. This is the one-time setup
+// step the rest of the admin flow assumes: create an analyst here once, then
+// just pick them by name on every slip after — never re-enter them.
+func (s *Server) handleAdminCreateAnalyst(w http.ResponseWriter, r *http.Request) {
+	var req createAnalystRequest
+	if err := decodeBody(r, &req); err != nil {
+		render.Error(w, r, err, s.Log)
+		return
+	}
+	if req.Name == "" {
+		render.Error(w, r, fmt.Errorf("%w: name is required", domain.ErrValidation), s.Log)
+		return
+	}
+	if req.Handle == "" {
+		render.Error(w, r, fmt.Errorf("%w: handle is required", domain.ErrValidation), s.Log)
+		return
+	}
+	if req.Initials == "" {
+		render.Error(w, r, fmt.Errorf("%w: initials is required", domain.ErrValidation), s.Log)
+		return
+	}
+
+	admin, _ := auth.UserFrom(r.Context())
+
+	var analyst domain.Analyst
+	err := s.DB.InTx(r.Context(), func(tx pgx.Tx) error {
+		var err error
+		analyst, err = s.DB.CreateAnalyst(r.Context(), tx, req.Name, req.Handle, req.Initials, req.Bio)
+		if err != nil {
+			return err
+		}
+		return s.DB.WriteAudit(r.Context(), tx, postgres.AuditEntry{
+			ActorType: postgres.ActorAdmin,
+			ActorID:   &admin.ID,
+			Action:    "analyst.created",
+			Entity:    "analyst",
+			EntityID:  &analyst.ID,
+			After:     map[string]any{"name": req.Name, "handle": req.Handle},
+		})
+	})
+	if err != nil {
+		render.Error(w, r, err, s.Log)
+		return
+	}
+	render.Status(w, http.StatusCreated, analyst)
+}
+
+// handleAdminDeactivateAnalyst removes an analyst from the public roster.
+// Their published slips and settled tips are untouched — this only stops
+// them appearing as an option for new ones.
+func (s *Server) handleAdminDeactivateAnalyst(w http.ResponseWriter, r *http.Request) {
+	analystID, err := parseUUID(r.PathValue("id"), "analyst id")
+	if err != nil {
+		render.Error(w, r, err, s.Log)
+		return
+	}
+	admin, _ := auth.UserFrom(r.Context())
+
+	err = s.DB.InTx(r.Context(), func(tx pgx.Tx) error {
+		if err := s.DB.DeactivateAnalyst(r.Context(), tx, analystID); err != nil {
+			return err
+		}
+		return s.DB.WriteAudit(r.Context(), tx, postgres.AuditEntry{
+			ActorType: postgres.ActorAdmin,
+			ActorID:   &admin.ID,
+			Action:    "analyst.deactivated",
+			Entity:    "analyst",
+			EntityID:  &analystID,
+		})
+	})
+	if err != nil {
+		render.Error(w, r, err, s.Log)
+		return
+	}
+	render.NoContent(w)
+}
+
 type addTipRequest struct {
 	AnalystID      uuid.UUID  `json:"analystId"`
 	MatchID        *uuid.UUID `json:"matchId,omitempty"`
@@ -212,6 +296,117 @@ func (s *Server) handleAdminAddTip(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	render.Status(w, http.StatusCreated, map[string]any{"id": tipID})
+}
+
+type bulkTipItem struct {
+	FixtureLabel   string    `json:"fixtureLabel"`
+	MarketLabel    string    `json:"marketLabel"`
+	SelectionLabel string    `json:"selectionLabel"`
+	Odds           string    `json:"odds"`
+	KickoffAt      time.Time `json:"kickoffAt"`
+	Note           *string   `json:"note,omitempty"`
+}
+
+type bulkAddTipsRequest struct {
+	AnalystID uuid.UUID     `json:"analystId"`
+	Tips      []bulkTipItem `json:"tips"`
+}
+
+// handleAdminBulkAddTips is handleAdminAddTip repeated in one transaction —
+// the backend side of pasting a whole list of matches in at once instead of
+// filling the single-tip form N times.
+//
+// Every tip here is free text, settled by hand later: matching pasted team
+// names against real match rows well enough to auto-grade isn't reliable
+// enough to trust, so bulk tips never carry a matchId. The admin UI parses
+// whatever was pasted and shows an editable preview before this endpoint
+// ever sees it — this handler validates each item exactly as
+// handleAdminAddTip would, and trusts nothing about where the text came from.
+func (s *Server) handleAdminBulkAddTips(w http.ResponseWriter, r *http.Request) {
+	slipID, err := parseUUID(r.PathValue("id"), "slip id")
+	if err != nil {
+		render.Error(w, r, err, s.Log)
+		return
+	}
+	var req bulkAddTipsRequest
+	if err := decodeBody(r, &req); err != nil {
+		render.Error(w, r, err, s.Log)
+		return
+	}
+	if req.AnalystID == uuid.Nil {
+		render.Error(w, r, fmt.Errorf("%w: analystId is required", domain.ErrValidation), s.Log)
+		return
+	}
+	if len(req.Tips) == 0 {
+		render.Error(w, r, fmt.Errorf("%w: at least one tip is required", domain.ErrValidation), s.Log)
+		return
+	}
+
+	odds := make([]decimal.Decimal, len(req.Tips))
+	for i, t := range req.Tips {
+		// 1-based in the message: it lines up with what the admin sees as a
+		// row number in the paste preview, not a Go index.
+		if t.FixtureLabel == "" || t.MarketLabel == "" || t.SelectionLabel == "" {
+			render.Error(w, r, fmt.Errorf(
+				"%w: row %d is missing a fixture, market, or selection", domain.ErrValidation, i+1), s.Log)
+			return
+		}
+		if t.KickoffAt.IsZero() {
+			render.Error(w, r, fmt.Errorf(
+				"%w: row %d is missing a kickoff time", domain.ErrValidation, i+1), s.Log)
+			return
+		}
+		parsed, err := decimal.NewFromString(t.Odds)
+		if err != nil || !parsed.GreaterThan(decimal.NewFromInt(1)) {
+			render.Error(w, r, fmt.Errorf(
+				"%w: row %d's odds must be a decimal string greater than 1", domain.ErrValidation, i+1), s.Log)
+			return
+		}
+		odds[i] = parsed
+	}
+
+	admin, _ := auth.UserFrom(r.Context())
+
+	var tipIDs []uuid.UUID
+	err = s.DB.InTx(r.Context(), func(tx pgx.Tx) error {
+		var base int
+		if err := tx.QueryRow(r.Context(),
+			`SELECT count(*) FROM tips WHERE slip_id = $1`, slipID).Scan(&base); err != nil {
+			return fmt.Errorf("count existing tips: %w", err)
+		}
+
+		for i, t := range req.Tips {
+			tipID, err := s.DB.AddTip(r.Context(), tx, domain.Tip{
+				SlipID:         slipID,
+				AnalystID:      req.AnalystID,
+				FixtureLabel:   t.FixtureLabel,
+				MarketLabel:    t.MarketLabel,
+				SelectionLabel: t.SelectionLabel,
+				Odds:           odds[i],
+				KickoffAt:      t.KickoffAt,
+				Note:           t.Note,
+				Position:       base + i + 1,
+			})
+			if err != nil {
+				return err
+			}
+			tipIDs = append(tipIDs, tipID)
+		}
+
+		return s.DB.WriteAudit(r.Context(), tx, postgres.AuditEntry{
+			ActorType: postgres.ActorAdmin,
+			ActorID:   &admin.ID,
+			Action:    "tips.bulk_added",
+			Entity:    "slip",
+			EntityID:  &slipID,
+			After:     map[string]any{"count": len(tipIDs)},
+		})
+	})
+	if err != nil {
+		render.Error(w, r, err, s.Log)
+		return
+	}
+	render.Status(w, http.StatusCreated, map[string]any{"ids": tipIDs, "count": len(tipIDs)})
 }
 
 func (s *Server) handleAdminPublishSlip(w http.ResponseWriter, r *http.Request) {

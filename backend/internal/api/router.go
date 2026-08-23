@@ -89,11 +89,17 @@ func (s *Server) Handler() http.Handler {
 	// Admin. Every route writes audit_log.
 	mux.HandleFunc("POST /v1/admin/slips", s.requireAdmin(s.handleAdminCreateSlip))
 	mux.HandleFunc("POST /v1/admin/slips/{id}/tips", s.requireAdmin(s.handleAdminAddTip))
+	mux.HandleFunc("POST /v1/admin/slips/{id}/tips/bulk", s.requireAdmin(s.handleAdminBulkAddTips))
 	mux.HandleFunc("POST /v1/admin/slips/{id}/publish", s.requireAdmin(s.handleAdminPublishSlip))
 	mux.HandleFunc("DELETE /v1/admin/slips/{id}", s.requireAdmin(s.handleAdminDeleteSlip))
 	mux.HandleFunc("POST /v1/admin/tips/{id}/settle", s.requireAdmin(s.handleAdminSettleTip))
 	mux.HandleFunc("POST /v1/admin/matches/{id}/correct", s.requireAdmin(s.handleAdminCorrectMatch))
 	mux.HandleFunc("GET /v1/admin/ingest/status", s.requireAdmin(s.handleAdminIngestStatus))
+
+	// Analysts are named once here and picked by name everywhere else — no
+	// per-slip re-entry, and no reactivation path once deactivated.
+	mux.HandleFunc("POST /v1/admin/analysts", s.requireAdmin(s.handleAdminCreateAnalyst))
+	mux.HandleFunc("DELETE /v1/admin/analysts/{id}", s.requireAdmin(s.handleAdminDeactivateAnalyst))
 
 	// Money: where it came from, and what a given statement line was for.
 	mux.HandleFunc("GET /v1/admin/revenue", s.requireAdmin(s.handleAdminRevenue))

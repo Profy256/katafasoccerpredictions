@@ -6,6 +6,7 @@ import { signOutAction } from '@/app/actions';
 const NAV: Array<{ href: string; label: string }> = [
   { href: '/', label: 'Dashboard' },
   { href: '/slips', label: 'Slips' },
+  { href: '/analysts', label: 'Analysts' },
   { href: '/revenue', label: 'Revenue' },
   { href: '/payments', label: 'Payments' },
 ];

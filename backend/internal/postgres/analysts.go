@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"sort"
+	"strings"
 	"time"
 
 	"github.com/google/uuid"
@@ -168,6 +169,77 @@ func (db *DB) AnalystRecord(ctx context.Context, slug string) (domain.AnalystRec
 		}
 	}
 	return domain.AnalystRecord{}, domain.ErrNotFound
+}
+
+// CreateAnalyst names a new analyst, active immediately. This is a one-time
+// setup step, not something done per slip: an analyst is created once here
+// and then just picked by name everywhere else a slip or tip references them.
+//
+// Slug is derived from the name; name and handle must each be unique, same as
+// the schema enforces — a collision comes back as ErrConflict rather than
+// being silently disambiguated, since two analysts sharing a name is worth an
+// admin's attention.
+func (db *DB) CreateAnalyst(ctx context.Context, q Querier, name, handle, initials, bio string) (domain.Analyst, error) {
+	a := domain.Analyst{
+		Slug:     analystSlug(name),
+		Name:     name,
+		Handle:   handle,
+		Initials: initials,
+		Bio:      bio,
+		JoinedAt: time.Now().UTC(),
+	}
+	err := q.QueryRow(ctx, `
+		INSERT INTO analysts (slug, name, handle, initials, bio, joined_at, is_active)
+		VALUES ($1,$2,$3,$4,$5,$6,TRUE)
+		RETURNING id`,
+		a.Slug, a.Name, a.Handle, a.Initials, a.Bio, a.JoinedAt).Scan(&a.ID)
+	if err != nil {
+		if isUniqueViolation(err) {
+			return domain.Analyst{}, fmt.Errorf(
+				"%w: an analyst with that name or handle already exists", domain.ErrConflict)
+		}
+		return domain.Analyst{}, fmt.Errorf("insert analyst: %w", err)
+	}
+	return a, nil
+}
+
+// DeactivateAnalyst takes an analyst off the public roster without deleting
+// the row: published slips and settled tips reference analyst_id, and that
+// history stays intact and auditable regardless. There is no reactivation
+// path in the API — removal is meant to be a deliberate, occasional action,
+// not one to make reversible by accident.
+func (db *DB) DeactivateAnalyst(ctx context.Context, q Querier, id uuid.UUID) error {
+	tag, err := q.Exec(ctx, `UPDATE analysts SET is_active = FALSE WHERE id = $1`, id)
+	if err != nil {
+		return fmt.Errorf("deactivate analyst: %w", err)
+	}
+	if tag.RowsAffected() == 0 {
+		return domain.ErrNotFound
+	}
+	return nil
+}
+
+// analystSlug mirrors TeamSlug's character mapping (lowercase alphanumerics,
+// runs of separators collapsed to one hyphen) but without a disambiguating
+// suffix — the unique constraint on slug is the backstop, and a collision is
+// rare enough that surfacing it as a conflict beats guessing at one.
+func analystSlug(name string) string {
+	base := strings.Trim(strings.Map(func(r rune) rune {
+		switch {
+		case r >= 'a' && r <= 'z', r >= '0' && r <= '9':
+			return r
+		case r >= 'A' && r <= 'Z':
+			return r + 32
+		case r == ' ' || r == '-' || r == '_':
+			return '-'
+		default:
+			return -1
+		}
+	}, name), "-")
+	if base == "" {
+		base = "analyst"
+	}
+	return base
 }
 
 // round2 matches the frontend's Math.round(profitUnits * 100) / 100, so the
