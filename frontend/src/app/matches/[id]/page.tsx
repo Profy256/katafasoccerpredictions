@@ -117,8 +117,8 @@ export default async function MatchPage({ params }: PageProps<'/matches/[id]'>) 
       <section className="mt-8">
         <h2 className="text-lg font-semibold tracking-tight">Published markets</h2>
         <p className="mt-1 text-sm text-fg-muted">
-          Confidence is the model&rsquo;s own probability for the pick — not a
-          separate rating.
+          Each chart shows the model&rsquo;s full probability distribution for
+          the market.
         </p>
         <div className="mt-4 grid gap-3 md:grid-cols-2 xl:grid-cols-3">
           {predictions.map((prediction) => (

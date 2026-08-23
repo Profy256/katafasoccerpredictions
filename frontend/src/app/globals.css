@@ -1,39 +1,94 @@
 @import "tailwindcss";
 
 /**
- * Committed dark theme.
+ * Dual theme (light + dark), driven by a `.dark` class on <html>.
  *
- * Chart colours are not chosen by eye — the marks below were validated against
- * the card surface (#111823) for lightness band, chroma, CVD separation and
+ * A tiny inline script in the root layout sets that class before first paint
+ * from localStorage, falling back to the OS preference. Tokens live as raw
+ * custom properties on :root / .dark and are exposed to Tailwind through
+ * `@theme inline`, so every `bg-canvas`-style utility re-resolves per theme
+ * with no component changes.
+ *
+ * Chart colours are not chosen by eye — each pair below was validated against
+ * its theme's card surface for lightness band, chroma, CVD separation and
  * WCAG contrast. Two consequences are baked into the components:
  *
  *  - Magnitude charts use ONE hue (--color-brand); length carries the value.
- *  - --color-good and --color-crit are ~4.1 ΔE apart under deuteranopia, so a
- *    hit/miss indicator must ALWAYS pair the colour with an icon and a text
- *    label. Never let colour alone carry the outcome.
+ *  - --color-good and --color-crit stay clearly separated under deuteranopia,
+ *    so a hit/miss indicator must ALWAYS pair the colour with an icon and a
+ *    text label. Never let colour alone carry the outcome.
  */
-@theme {
-  --color-canvas: #0a0e15;
-  --color-surface: #111823;
-  --color-surface-hi: #18212e;
-  --color-line: #232e3d;
-  --color-line-soft: #1a2331;
 
-  --color-fg: #e8eef6;
-  --color-fg-muted: #93a3b8;
-  --color-fg-dim: #64748b;
+@custom-variant dark (&:where(.dark, .dark *));
+
+:root {
+  --canvas: #f5f7fa;
+  --surface: #ffffff;
+  --surface-hi: #edf1f6;
+  --line: #dbe2ea;
+  --line-soft: #e8edf3;
+
+  --fg: #101828;
+  --fg-muted: #4a5872;
+  --fg-dim: #7c8aa1;
 
   /* Primary accent, and the single hue used for all magnitude charts. */
-  --color-brand: #3987e5;
-  --color-brand-deep: #1c5cab;
-  --color-brand-pale: #86b6ef;
+  --brand: #2065d6;
+  --brand-deep: #164a9e;
+  /* "Pale" reads as text on a brand-tinted chip — on light ground it must
+     darken rather than lighten to stay legible. */
+  --brand-pale: #1c5cab;
 
   /* Reserved status colours — never reused as a series colour. */
-  --color-good: #0ca30c;
-  --color-good-text: #5fd35f;
-  --color-crit: #d03b3b;
-  --color-crit-text: #f2a0a0;
-  --color-warn: #fab219;
+  --good: #17851c;
+  --good-text: #147a19;
+  --crit: #cf3434;
+  --crit-text: #b02a2a;
+  --warn: #b45309;
+}
+
+.dark {
+  --canvas: #0a0e15;
+  --surface: #111823;
+  --surface-hi: #18212e;
+  --line: #232e3d;
+  --line-soft: #1a2331;
+
+  --fg: #e8eef6;
+  --fg-muted: #93a3b8;
+  --fg-dim: #64748b;
+
+  --brand: #3987e5;
+  --brand-deep: #1c5cab;
+  --brand-pale: #86b6ef;
+
+  --good: #0ca30c;
+  --good-text: #5fd35f;
+  --crit: #d03b3b;
+  --crit-text: #f2a0a0;
+  --warn: #fab219;
+}
+
+@theme inline {
+  --color-canvas: var(--canvas);
+  --color-surface: var(--surface);
+  --color-surface-hi: var(--surface-hi);
+  --color-line: var(--line);
+  --color-line-soft: var(--line-soft);
+
+  --color-fg: var(--fg);
+  --color-fg-muted: var(--fg-muted);
+  --color-fg-dim: var(--fg-dim);
+
+  --color-brand: var(--brand);
+  --color-brand-deep: var(--brand-deep);
+  --color-brand-pale: var(--brand-pale);
+
+  --color-good: var(--good);
+  --color-good-text: var(--good-text);
+  --color-crit: var(--crit);
+  --color-crit-text: var(--crit-text);
+  --color-warn: var(--warn);
 
   --font-sans: var(--font-geist-sans), ui-sans-serif, system-ui, sans-serif;
   --font-mono: var(--font-geist-mono), ui-monospace, monospace;
@@ -41,29 +96,52 @@
 
 @layer base {
   html {
+    color-scheme: light;
+  }
+
+  html.dark {
     color-scheme: dark;
   }
 
   body {
-    background-color: var(--color-canvas);
-    color: var(--color-fg);
+    background-color: var(--canvas);
+    color: var(--fg);
     font-family: var(--font-sans);
     -webkit-font-smoothing: antialiased;
+    text-rendering: optimizeLegibility;
+  }
+
+  h1,
+  h2,
+  h3 {
+    letter-spacing: -0.02em;
   }
 
   :focus-visible {
-    outline: 2px solid var(--color-brand);
+    outline: 2px solid var(--brand);
     outline-offset: 2px;
     border-radius: 2px;
   }
 
   ::selection {
-    background-color: color-mix(in oklab, var(--color-brand) 35%, transparent);
+    background-color: color-mix(in oklab, var(--brand) 35%, transparent);
   }
+}
+
+/* Theme-toggle icon swap without hydration branching: the component always
+   renders both icons and this decides which one is visible. */
+.theme-icon-light {
+  display: none;
+}
+.dark .theme-icon-light {
+  display: block;
+}
+.dark .theme-icon-dark {
+  display: none;
 }
 
 /* Recessive gridlines: hairline, solid, one step off the surface. */
 @utility grid-line {
-  stroke: var(--color-line);
+  stroke: var(--line);
   stroke-width: 1;
 }

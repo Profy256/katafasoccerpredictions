@@ -2,9 +2,7 @@ import type { Prediction, PredictionResult } from '@/api/types';
 import { MARKETS } from '@/lib/markets';
 import { settledOutcomeLabel } from '@/lib/poisson';
 import { formatPct } from '@/lib/format';
-import { OutcomeBadge } from './OutcomeBadge';
-
-/**
+import { OutcomeBadge } from './OutcomeBadge';/**
  * One market's full probability distribution.
  *
  * Uses the emphasis pattern rather than a categorical palette: the published
@@ -67,8 +65,7 @@ export function MarketBreakdown({
         Published pick:{' '}
         <span className="font-semibold text-fg">
           {market.outcomes.find((o) => o.value === prediction.predictionValue)?.label}
-        </span>{' '}
-        at {formatPct(prediction.confidencePct, 1)} confidence
+        </span>
         {result && (
           <>
             {' · '}Settled:{' '}

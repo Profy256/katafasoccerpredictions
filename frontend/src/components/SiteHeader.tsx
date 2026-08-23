@@ -3,6 +3,7 @@
 import Image from 'next/image';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
+import { ThemeToggle } from '@/components/ThemeToggle';
 
 const NAV = [
   { href: '/', label: 'Free tips' },
@@ -50,23 +51,30 @@ export function SiteHeader({ signedIn }: { signedIn: boolean }) {
                 key={item.href}
                 href={item.href}
                 aria-current={active ? 'page' : undefined}
-                className={`rounded-lg px-2.5 py-1.5 text-[13px] transition-colors sm:px-3 sm:text-sm ${
+                className={`relative rounded-lg px-2.5 py-1.5 text-[13px] transition-colors sm:px-3 sm:text-sm ${
                   active
-                    ? 'bg-surface-hi text-fg'
-                    : 'text-fg-muted hover:bg-surface hover:text-fg'
+                    ? 'font-medium text-fg'
+                    : 'text-fg-muted hover:bg-surface-hi hover:text-fg'
                 }`}
               >
                 {item.label}
+                {active && (
+                  <span
+                    aria-hidden
+                    className="absolute inset-x-2.5 -bottom-4 h-0.5 rounded-full bg-brand sm:inset-x-3"
+                  />
+                )}
               </Link>
             );
           })}
         </nav>
 
-        <div className="ml-auto flex items-center gap-3">
+        <div className="ml-auto flex items-center gap-2.5 sm:gap-3">
           <span className="hidden text-xs text-fg-dim lg:block">All times UTC</span>
+          <ThemeToggle />
           <Link
             href={signedIn ? '/pro' : '/login'}
-            className="hidden rounded-lg border border-line px-2.5 py-1.5 text-[13px] text-fg-muted hover:border-brand/40 hover:text-brand sm:block"
+            className="hidden rounded-lg border border-line px-3 py-1.5 text-[13px] font-medium transition-colors hover:border-brand/50 hover:text-brand sm:block"
           >
             {signedIn ? 'My slips' : 'Sign in'}
           </Link>

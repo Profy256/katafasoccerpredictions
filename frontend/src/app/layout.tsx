@@ -65,8 +65,17 @@ const SITE_JSON_LD = {
 };
 
 export const viewport: Viewport = {
-  themeColor: '#0a0e15',
+  themeColor: [
+    { media: '(prefers-color-scheme: light)', color: '#f5f7fa' },
+    { media: '(prefers-color-scheme: dark)', color: '#0a0e15' },
+  ],
 };
+
+/**
+ * Runs before first paint so the theme class is already on <html> when CSS
+ * lands — no flash of the wrong theme. Stored choice wins; otherwise light.
+ */
+const THEME_INIT = `(function(){try{var t=localStorage.getItem('katafa-theme');if(t!=='light'&&t!=='dark'){t='light'}document.documentElement.classList.toggle('dark',t==='dark')}catch(e){}})()`;
 
 export default async function RootLayout({ children }: LayoutProps<'/'>) {
   const session = await getSession();
@@ -75,7 +84,11 @@ export default async function RootLayout({ children }: LayoutProps<'/'>) {
     <html
       lang="en"
       className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}
+      suppressHydrationWarning
     >
+      <head>
+        <script dangerouslySetInnerHTML={{ __html: THEME_INIT }} />
+      </head>
       <body className="flex min-h-full flex-col bg-canvas text-fg">
         {/* Static JSON-LD, no user input. */}
         <script

@@ -2,7 +2,6 @@ import Link from 'next/link';
 import type { MatchWithPredictions } from '@/api/types';
 import { MARKETS, outcomeLabel } from '@/lib/markets';
 import { formatTime } from '@/lib/format';
-import { ConfidenceMeter } from './ConfidenceMeter';
 import { LeagueChip } from './LeagueChip';
 
 /** One fixture in the feed, with every published market for it (FR-1, FR-2). */
@@ -53,15 +52,6 @@ export function MatchCard({ entry }: { entry: MatchWithPredictions }) {
             <p className="mt-0.5 truncate text-[13px] font-semibold">
               {outcomeLabel(prediction.marketType, prediction.predictionValue)}
             </p>
-            <div className="mt-1.5">
-              <ConfidenceMeter
-                pct={prediction.confidencePct}
-                label={`Model confidence in ${outcomeLabel(
-                  prediction.marketType,
-                  prediction.predictionValue,
-                )} for ${homeTeam.name} versus ${awayTeam.name}`}
-              />
-            </div>
           </div>
         ))}
       </div>

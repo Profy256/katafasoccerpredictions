@@ -2,7 +2,6 @@ import Link from 'next/link';
 import type { FreeTipGroup } from '@/api/types';
 import { MARKETS, outcomeLabel } from '@/lib/markets';
 import { formatOdds, formatTime } from '@/lib/format';
-import { ConfidenceMeter } from './ConfidenceMeter';
 import { LeagueChip } from './LeagueChip';
 
 /**
@@ -48,15 +47,6 @@ export function FreeTipsSection({ group }: { group: FreeTipGroup }) {
                   <p className="text-sm font-semibold text-brand-pale">
                     {outcomeLabel(prediction.marketType, prediction.predictionValue)}
                   </p>
-                  <div className="mt-1">
-                    <ConfidenceMeter
-                      pct={prediction.confidencePct}
-                      label={`Model confidence in ${outcomeLabel(
-                        prediction.marketType,
-                        prediction.predictionValue,
-                      )} for ${homeTeam.name} versus ${awayTeam.name}`}
-                    />
-                  </div>
                 </div>
 
                 <span className="shrink-0 rounded-lg border border-line bg-canvas/60 px-2.5 py-1.5 text-sm font-semibold tabular-nums">
