@@ -52,7 +52,7 @@ export function BulkAddTipsForm({
   return (
     <div className="mt-4 space-y-4 rounded-lg border border-line p-4">
       <div>
-        <label htmlFor="bulkText">Paste here</label>
+        <label htmlFor="bulkText">Your list</label>
         <textarea
           id="bulkText"
           rows={6}
@@ -69,7 +69,7 @@ export function BulkAddTipsForm({
             type="button"
             onClick={onParse}
             disabled={!text.trim()}
-            className="rounded-lg border border-line px-3 py-1.5 text-xs hover:border-brand disabled:cursor-not-allowed disabled:opacity-40"
+            className="rounded-lg bg-brand px-3 py-1.5 text-xs font-medium text-canvas hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-40"
           >
             Parse into rows
           </button>
