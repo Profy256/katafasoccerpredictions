@@ -114,11 +114,11 @@ type GeneratePredictionsWorker struct {
 }
 
 func (w *GeneratePredictionsWorker) Work(ctx context.Context, job *river.Job[GeneratePredictions]) error {
-	hours := job.Args.HoursAhead
-	if hours <= 0 {
-		hours = 48
+	window := predict.Horizon
+	if job.Args.HoursAhead > 0 {
+		window = time.Duration(job.Args.HoursAhead) * time.Hour
 	}
-	stats, err := w.Deps.Predictor.GenerateUpcoming(ctx, time.Duration(hours)*time.Hour)
+	stats, err := w.Deps.Predictor.GenerateUpcoming(ctx, window)
 	if err != nil {
 		return err
 	}

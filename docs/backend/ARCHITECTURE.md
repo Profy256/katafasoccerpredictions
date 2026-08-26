@@ -102,13 +102,27 @@ River cron schedules, all times UTC:
 | `sync_fixtures` | daily 03:00 | Pull the next 14 days of fixtures for every active competition |
 | `sync_fixtures_near` | hourly | Re-pull fixtures kicking off in the next 36h to catch reschedules |
 | `sync_results` | every 30 min | Pull finals for matches whose kickoff was ≥ 2h ago and are still unfinished |
-| `generate_predictions` | daily 04:00 | Run the engine for fixtures kicking off in the next 48h that have no prediction |
+| `generate_predictions` | daily 04:00 | Run the engine for every fixture inside `predict.Horizon` (7 days) that has no prediction |
 | `publish_free_tips` | daily 05:00 | Select and **freeze** the day's free shortlist |
 | `settle_predictions` | every 30 min, after `sync_results` | Grade newly finished matches |
 | `settle_slips` | every 30 min, after `settle_predictions` | Grade auto-gradable tips, close fully-graded slips |
 | `refresh_accuracy` | after any settlement batch | `REFRESH MATERIALIZED VIEW CONCURRENTLY accuracy_rollup` |
 | `reconcile_payments` | every 15 min | Poll MarzPay for transactions stuck in `processing` |
 | `expire_sessions` | daily 01:00 | Delete expired session rows |
+
+`predict.Horizon` is the number that decides how much football the site shows.
+A fixture with no prediction is dropped by the feed, so anything ingested past
+the horizon is invisible — no feed row, no team or league page entry, no match
+URL in the sitemap, nothing for the free shortlist to select from. It ran at
+48 hours until a midweek day left the entire site showing one fixture.
+
+It is not simply maximised: predictions are immutable and a fixture is priced
+once per model version, so a pick made seven days out is locked in on
+seven-day-old form and enters the accuracy record that way. Seven days keeps
+the coming weekend visible from midweek without pricing a fortnight on stale
+form. It must stay at least `tips.MaxWindowDays` long or the shortlist window
+reaches days with nothing on them — `TestHorizonCoversShortlistWindow` asserts
+it.
 
 Ordering matters and is not left to luck: `settle_predictions` enqueues
 `settle_slips` on completion rather than both racing on a shared cron minute.

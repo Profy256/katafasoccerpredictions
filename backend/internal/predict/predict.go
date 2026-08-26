@@ -27,6 +27,31 @@ type Service struct {
 	ModelVersion string
 }
 
+// Horizon is how far ahead the model prices fixtures.
+//
+// This is the single number that decides how much football the site can show.
+// Predictions are what make a fixture visible at all — the feed drops any
+// fixture with none attached — so a horizon shorter than the fixture sync
+// leaves everything past it ingested and invisible: no feed row, no team-page
+// entry, no league-page entry, no match URL in the sitemap, and nothing for
+// the free shortlist to select from. At the old 48 hours a midweek day showed
+// a single fixture across the entire site.
+//
+// It is not simply maximised, because predictions are immutable and
+// UpcomingFixtures skips a fixture already priced at this model version: a
+// pick made seven days out keeps that pick, made on form seven days stale,
+// and it goes into the permanent accuracy record that way. Seven days is the
+// point where the coming weekend is always visible from midweek without
+// pricing a fortnight of football on old form.
+//
+// Walk-forward is unaffected either way — the model only ever reads results
+// from before the fixture it is pricing, whenever it runs.
+//
+// It must stay at least tips.MaxWindowDays long, or the shortlist's window can
+// reach days that have nothing priced on them. TestHorizonCoversShortlistWindow
+// pins that.
+const Horizon = 7 * 24 * time.Hour
+
 type Stats struct {
 	Fixtures    int
 	Predictions int

@@ -320,7 +320,7 @@ func publishCmd(ctx context.Context, db *postgres.DB, log *slog.Logger, cfg *con
 
 func predictCmd(ctx context.Context, db *postgres.DB, log *slog.Logger, cfg *config.Config, args []string) error {
 	fs := flag.NewFlagSet("predict", flag.ContinueOnError)
-	hours := fs.Int("hours", 48, "how far ahead to predict")
+	hours := fs.Int("hours", int(predict.Horizon/time.Hour), "how far ahead to predict")
 	if err := fs.Parse(args); err != nil {
 		return err
 	}

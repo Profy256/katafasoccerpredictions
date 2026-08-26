@@ -10,6 +10,8 @@ import (
 	"time"
 
 	"github.com/riverqueue/river"
+
+	"github.com/Profy256/katafasoccerpredictions/backend/internal/predict"
 )
 
 // Job argument types. Kind() is the stable name stored in the queue, so
@@ -152,10 +154,12 @@ func PeriodicJobs() []*river.PeriodicJob {
 			func() (river.JobArgs, *river.InsertOpts) { return SyncResults{}, nil },
 			&river.PeriodicJobOpts{RunOnStart: true}),
 
-		// Daily 04:00 — predictions for fixtures kicking off in the next 48h.
+		// Daily 04:00 — price every fixture inside predict.Horizon. A fixture
+		// with no prediction is invisible to the feed, so this is what decides
+		// how much football the site shows.
 		river.NewPeriodicJob(dailyAt{4, 0},
 			func() (river.JobArgs, *river.InsertOpts) {
-				return GeneratePredictions{HoursAhead: 48}, nil
+				return GeneratePredictions{HoursAhead: int(predict.Horizon / time.Hour)}, nil
 			},
 			&river.PeriodicJobOpts{RunOnStart: false}),
 
