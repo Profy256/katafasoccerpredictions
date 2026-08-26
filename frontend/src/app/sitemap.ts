@@ -4,6 +4,11 @@ import { MARKETS, marketHref, DEFAULT_MARKET } from '@/lib/markets';
 import { leagueSlugMap } from '@/lib/leagues';
 import { collectTeams, teamSlugMap } from '@/lib/teams';
 
+// The build machine has no API to ask, and every fetch below falls back to an
+// empty list, so a cached sitemap would ship frozen with only the static
+// routes — no leagues, teams, analysts or slips.
+export const dynamic = 'force-dynamic';
+
 const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL ?? 'http://localhost:3000';
 
 /**

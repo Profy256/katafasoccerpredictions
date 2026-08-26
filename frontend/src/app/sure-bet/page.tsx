@@ -1,6 +1,10 @@
 import type { Metadata } from 'next';
 import Link from 'next/link';
 
+// No data of its own, but the root layout reads the session per request, so
+// nothing here can be prerendered — the build has no API to ask.
+export const dynamic = 'force-dynamic';
+
 export const metadata: Metadata = {
   title: 'Sure Bets: What They Really Are (and What to Check For)',
   description:
