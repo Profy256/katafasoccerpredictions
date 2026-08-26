@@ -10,7 +10,8 @@ import type { MatchWithPredictions, SettledPrediction } from '@/api/types';
 import { OutcomeBadge } from '@/components/OutcomeBadge';
 import { MARKETS, outcomeLabel } from '@/lib/markets';
 import { formatDate } from '@/lib/format';
-import { collectTeams, teamSlugMap, type TeamWithLeague } from '@/lib/teams';
+import { matchHref } from '@/lib/matches';
+import { resolveTeamSlugs, type TeamWithLeague } from '@/lib/teams';
 
 export const dynamic = 'force-dynamic';
 
@@ -29,18 +30,13 @@ async function loadData(): Promise<{
   ledger: SettledPrediction[];
   slugMap: Map<string, TeamWithLeague>;
 }> {
-  const [feed, ledger] = await Promise.all([
+  const [feed, ledger, leagues] = await Promise.all([
     getFeed(),
     getSettledPredictions({ limit: 500 }).catch(() => []),
+    // Leagues are only needed to disambiguate same-named teams by country.
+    getLeagues().catch(() => []),
   ]);
-  // Leagues are only needed to disambiguate same-named teams by country.
-  const leagues = await getLeagues().catch(() => []);
-  const leagueById = new Map(leagues.map((l) => [l.id, l]));
-  const withLeague = [...collectTeams(feed, ledger).values()].map((entry) => ({
-    ...entry,
-    league: leagueById.get(entry.league.id) ?? entry.league,
-  }));
-  return { feed, ledger, slugMap: teamSlugMap(withLeague) };
+  return { feed, ledger, slugMap: resolveTeamSlugs(feed, ledger, leagues) };
 }
 
 export async function generateMetadata({
@@ -111,7 +107,7 @@ export default async function TeamPage({ params }: PageProps<'/teams/[slug]'>) {
             {upcoming.map((e) => (
               <Link
                 key={e.match.id}
-                href={`/matches/${e.match.id}`}
+                href={matchHref(e.homeTeam, e.awayTeam, e.match.id)}
                 className="block rounded-xl border border-line bg-surface p-4 hover:border-brand/40"
               >
                 <p className="text-sm font-semibold">
@@ -156,7 +152,10 @@ export default async function TeamPage({ params }: PageProps<'/teams/[slug]'>) {
                 {history.slice(0, 12).map((row) => (
                   <tr key={row.prediction.id} className="hover:bg-surface-hi/50">
                     <td className="px-4 py-3">
-                      <Link href={`/matches/${row.match.id}`} className="hover:text-brand">
+                      <Link
+                        href={matchHref(row.homeTeam, row.awayTeam, row.match.id)}
+                        className="hover:text-brand"
+                      >
                         {row.homeTeam.shortName} v {row.awayTeam.shortName}
                       </Link>
                       <span className="ml-2 text-xs text-fg-dim">

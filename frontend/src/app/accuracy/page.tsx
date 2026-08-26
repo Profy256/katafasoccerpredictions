@@ -10,6 +10,7 @@ import { MARKETS, outcomeLabel } from '@/lib/markets';
 import { leagueSlugMap, leagueHref } from '@/lib/leagues';
 import { settledOutcomeLabel } from '@/lib/poisson';
 import { formatCount, formatDate, formatRate } from '@/lib/format';
+import { matchHref } from '@/lib/matches';
 
 export const dynamic = 'force-dynamic';
 
@@ -261,7 +262,7 @@ export default async function AccuracyPage({ searchParams }: PageProps<'/accurac
                 <tr key={row.prediction.id} className="hover:bg-surface-hi/50">
                   <td className="px-4 py-3">
                     <Link
-                      href={`/matches/${row.match.id}`}
+                      href={matchHref(row.homeTeam, row.awayTeam, row.match.id)}
                       className="hover:text-brand"
                     >
                       {row.homeTeam.shortName} v {row.awayTeam.shortName}

@@ -2,6 +2,7 @@ import Link from 'next/link';
 import type { MatchWithPredictions } from '@/api/types';
 import { MARKETS, outcomeLabel } from '@/lib/markets';
 import { formatTime } from '@/lib/format';
+import { matchHref } from '@/lib/matches';
 import { LeagueChip } from './LeagueChip';
 
 /** One fixture in the feed, with every published market for it (FR-1, FR-2). */
@@ -10,7 +11,7 @@ export function MatchCard({ entry }: { entry: MatchWithPredictions }) {
 
   return (
     <Link
-      href={`/matches/${match.id}`}
+      href={matchHref(homeTeam, awayTeam, match.id)}
       className="group block rounded-xl border border-line bg-surface p-4 transition-colors hover:border-brand/40 hover:bg-surface-hi/60"
     >
       <div className="flex items-center justify-between gap-3">

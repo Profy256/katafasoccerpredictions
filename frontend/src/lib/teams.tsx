@@ -57,6 +57,29 @@ export function teamSlugMap(teams: Iterable<TeamWithLeague>): Map<string, TeamWi
   return map;
 }
 
+/**
+ * The one true slug resolution, shared by every caller.
+ *
+ * `teamSlugMap` disambiguates same-named teams by their league's country, so
+ * the answer depends on the league objects it is handed. Feed and ledger rows
+ * embed their own copy, and the leagues endpoint is the authority — resolving
+ * against it here means the sitemap, the match pages and the team pages can
+ * never disagree about a slug, which would otherwise surface as an internal
+ * link into a 404.
+ */
+export function resolveTeamSlugs(
+  feed: MatchWithPredictions[],
+  ledger: SettledPrediction[],
+  leagues: League[],
+): Map<string, TeamWithLeague> {
+  const leagueById = new Map(leagues.map((l) => [l.id, l]));
+  const withLeague = [...collectTeams(feed, ledger).values()].map((entry) => ({
+    ...entry,
+    league: leagueById.get(entry.league.id) ?? entry.league,
+  }));
+  return teamSlugMap(withLeague);
+}
+
 /** A team's landing-page href, or null when it has none. */
 export function teamHref(
   map: Map<string, TeamWithLeague>,
