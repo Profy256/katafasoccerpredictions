@@ -1,5 +1,4 @@
 import type { Scoreline } from '@/lib/poisson';
-import { formatPct } from '@/lib/format';
 
 /**
  * Most likely exact scorelines straight off the Poisson matrix.
@@ -28,7 +27,7 @@ export function ScorelineList({
       </p>
       <ul className="mt-3 space-y-2">
         {scorelines.map((s) => (
-          <li key={`${s.home}-${s.away}`} className="grid grid-cols-[3.5rem_1fr_3rem] items-center gap-3">
+          <li key={`${s.home}-${s.away}`} className="grid grid-cols-[3.5rem_1fr] items-center gap-3">
             <span className="font-mono text-xs tabular-nums text-fg">
               {s.home}–{s.away}
             </span>
@@ -37,9 +36,6 @@ export function ScorelineList({
                 className="block h-full rounded-r-[4px] bg-brand/70"
                 style={{ width: `${(s.probability / max) * 100}%` }}
               />
-            </span>
-            <span className="text-right text-xs tabular-nums text-fg-muted">
-              {formatPct(s.probability * 100, 1)}
             </span>
           </li>
         ))}

@@ -30,7 +30,7 @@ export async function generateMetadata({
   if (!league) return { title: 'League not found' };
   return {
     title: `${league.name} Predictions & Fixtures`,
-    description: `Free ${league.name} (${league.country}) predictions for every fixture — model probabilities across Match Result, Double Chance, BTTS and Over/Under, plus Katafa's graded accuracy record for this league.`,
+    description: `Free ${league.name} (${league.country}) predictions for every fixture — a published pick in every market from Match Result to Over/Under, plus Katafa's graded accuracy record for this league.`,
     alternates: { canonical: `/leagues/${slug}` },
   };
 }

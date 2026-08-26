@@ -48,12 +48,10 @@ export async function FreeTipsView({ market }: { market: MarketCode }) {
         <p className="mt-3 text-[15px] leading-relaxed text-fg-muted">
           {tips.totalTips} soccer tips — Match Result, Double Chance, Both
           Teams To Score and Over/Under goals — free and open to everyone. No
-          &ldquo;sure wins,&rdquo; just a probability for every pick and a{' '}
-          <Link href="/accuracy" className="text-brand hover:underline">
-            public record
-          </Link>{' '}
-          — currently {formatRate(accuracy.overall.hitRate)} across{' '}
-          {formatCount(accuracy.overall.total)} graded picks.
+          &ldquo;sure wins,&rdquo; no guarantees: every pick is graded against
+          the result and the full record — currently{' '}
+          {formatRate(accuracy.overall.hitRate)} across{' '}
+          {formatCount(accuracy.overall.total)} graded picks — is public.
         </p>
       </section>
 

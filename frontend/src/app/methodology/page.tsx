@@ -89,15 +89,15 @@ export default async function MethodologyPage() {
           What the confidence number means
         </h2>
         <p className="mt-3 text-[15px] leading-relaxed text-fg-muted">
-          The percentage shown next to a pick is the model&rsquo;s own probability
-          for that outcome. It is not a separate star rating, a marketing number,
-          or a rounded-up version of something less flattering. If the model makes
-          a pick at 64%, then 64% is genuinely what it thinks — which is why the{' '}
+          Every pick the model publishes carries an internal probability — its
+          own honest estimate for that outcome, not a separate star rating or a
+          marketing number. We show you the pick, not the arithmetic; what we
+          publish instead is the check:{' '}
           <Link href="/accuracy" className="text-brand hover:underline">
             accuracy page
           </Link>{' '}
-          can check whether picks published at 70% really do land about 70% of the
-          time.
+          charts whether picks made at higher confidence really do land more
+          often, in bands, for everyone to audit.
         </p>
         <p className="mt-3 text-[15px] leading-relaxed text-fg-muted">
           Even a 90% pick loses one time in ten — see the{' '}

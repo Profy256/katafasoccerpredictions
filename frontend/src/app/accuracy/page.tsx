@@ -9,7 +9,7 @@ import { OutcomeBadge } from '@/components/OutcomeBadge';
 import { MARKETS, outcomeLabel } from '@/lib/markets';
 import { leagueSlugMap, leagueHref } from '@/lib/leagues';
 import { settledOutcomeLabel } from '@/lib/poisson';
-import { formatCount, formatDate, formatPct, formatRate } from '@/lib/format';
+import { formatCount, formatDate, formatRate } from '@/lib/format';
 
 export const dynamic = 'force-dynamic';
 
@@ -252,7 +252,6 @@ export default async function AccuracyPage({ searchParams }: PageProps<'/accurac
                 <th scope="col" className="px-4 py-3 font-medium">Result</th>
                 <th scope="col" className="px-4 py-3 font-medium">Market</th>
                 <th scope="col" className="px-4 py-3 font-medium">Pick</th>
-                <th scope="col" className="px-4 py-3 font-medium">Conf.</th>
                 <th scope="col" className="px-4 py-3 font-medium">Settled as</th>
                 <th scope="col" className="px-4 py-3 font-medium">Outcome</th>
               </tr>
@@ -279,9 +278,6 @@ export default async function AccuracyPage({ searchParams }: PageProps<'/accurac
                   </td>
                   <td className="px-4 py-3">
                     {outcomeLabel(row.prediction.marketType, row.prediction.predictionValue)}
-                  </td>
-                  <td className="px-4 py-3 tabular-nums text-fg-muted">
-                    {formatPct(row.prediction.confidencePct, 0)}
                   </td>
                   <td className="px-4 py-3 text-fg-muted">
                     {settledOutcomeLabel(row.prediction.marketType, row.result.actualOutcome)}

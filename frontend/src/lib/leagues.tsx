@@ -12,7 +12,8 @@ import type { League } from '@/api/types';
  * the mapping depends only on the current league set, never on insert order.
  */
 
-function kebab(value: string): string {
+/** Kebab-case slug for a display name; shared by league and team URLs. */
+export function kebab(value: string): string {
   return value
     .toLowerCase()
     .normalize('NFKD')

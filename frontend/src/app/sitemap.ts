@@ -1,7 +1,8 @@
 import type { MetadataRoute } from 'next';
-import { getAnalysts, getLeagues, getSlips } from '@/api/client';
+import { getAnalysts, getFeed, getLeagues, getSettledPredictions, getSlips } from '@/api/client';
 import { MARKETS, marketHref, DEFAULT_MARKET } from '@/lib/markets';
 import { leagueSlugMap } from '@/lib/leagues';
+import { collectTeams, teamSlugMap } from '@/lib/teams';
 
 const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL ?? 'http://localhost:3000';
 
@@ -25,7 +26,22 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     { url: `${SITE_URL}/faq`, changeFrequency: 'monthly', priority: 0.7 },
     { url: `${SITE_URL}/analysts`, changeFrequency: 'daily', priority: 0.6 },
     { url: `${SITE_URL}/pro`, changeFrequency: 'daily', priority: 0.7 },
+    // Day-scoped prediction pages.
+    { url: `${SITE_URL}/predictions/today`, changeFrequency: 'hourly', priority: 0.9 },
+    { url: `${SITE_URL}/predictions/tomorrow`, changeFrequency: 'hourly', priority: 0.8 },
+    // Honest intent-capture guides for the "guaranteed win" search clusters.
+    { url: `${SITE_URL}/sure-win`, changeFrequency: 'monthly', priority: 0.6 },
+    { url: `${SITE_URL}/sure-bet`, changeFrequency: 'monthly', priority: 0.5 },
+    { url: `${SITE_URL}/fixed-matches`, changeFrequency: 'monthly', priority: 0.6 },
   ];
+
+  const marketAccuracyRoutes: MetadataRoute.Sitemap = Object.values(MARKETS).map(
+    (m) => ({
+      url: `${SITE_URL}/accuracy/${m.slug}`,
+      changeFrequency: 'daily',
+      priority: 0.7,
+    }),
+  );
 
   const marketRoutes: MetadataRoute.Sitemap = Object.values(MARKETS)
     .filter((m) => m.code !== DEFAULT_MARKET)
@@ -35,12 +51,15 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
       priority: 0.7,
     }));
 
-  const [analysts, openSlips, settledSlips, leagues] = await Promise.all([
-    getAnalysts().catch(() => []),
-    getSlips({ status: 'open' }).catch(() => []),
-    getSlips({ status: 'settled', limit: 500 }).catch(() => []),
-    getLeagues().catch(() => []),
-  ]);
+  const [analysts, openSlips, settledSlips, leagues, feed, gradedLedger] =
+    await Promise.all([
+      getAnalysts().catch(() => []),
+      getSlips({ status: 'open' }).catch(() => []),
+      getSlips({ status: 'settled', limit: 500 }).catch(() => []),
+      getLeagues().catch(() => []),
+      getFeed().catch(() => []),
+      getSettledPredictions({ limit: 500 }).catch(() => []),
+    ]);
 
   // One landing page per competition — the same slug mapping the pages use.
   const leagueRoutes: MetadataRoute.Sitemap = [...leagueSlugMap(leagues).keys()].map(
@@ -50,6 +69,17 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
       priority: 0.7,
     }),
   );
+
+  // Team pages exist only for teams with priced fixtures or graded picks —
+  // exactly what collectTeams resolves, so sitemap and pages can never
+  // disagree about which slugs are real.
+  const teamRoutes: MetadataRoute.Sitemap = [...teamSlugMap(
+    collectTeams(feed, gradedLedger).values(),
+  ).keys()].map((slug) => ({
+    url: `${SITE_URL}/teams/${slug}`,
+    changeFrequency: 'daily',
+    priority: 0.6,
+  }));
 
   const analystRoutes: MetadataRoute.Sitemap = analysts.map((a) => ({
     url: `${SITE_URL}/analysts/${a.slug}`,
@@ -66,7 +96,9 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   return [
     ...staticRoutes,
     ...marketRoutes,
+    ...marketAccuracyRoutes,
     ...leagueRoutes,
+    ...teamRoutes,
     ...analystRoutes,
     ...slipRoutes,
   ];

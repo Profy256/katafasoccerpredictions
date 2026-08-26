@@ -1,4 +1,5 @@
 import type { Metadata } from 'next';
+import Link from 'next/link';
 import { notFound, redirect } from 'next/navigation';
 import { FreeTipsView } from '@/components/FreeTipsView';
 import { MARKETS, DEFAULT_MARKET, marketFromSlug } from '@/lib/markets';
@@ -49,5 +50,21 @@ export default async function MarketTipsPage({ params }: PageProps<'/tips/[marke
   // The default market lives at '/', so keep a single canonical URL for it.
   if (code === DEFAULT_MARKET) redirect('/');
 
-  return <FreeTipsView market={code} />;
+  return (
+    <>
+      <FreeTipsView market={code} />
+      <div className="mx-auto max-w-3xl px-4 pb-8 sm:px-6">
+        <p className="border-t border-line pt-5 text-sm text-fg-muted">
+          How has this market actually performed? See the{' '}
+          <Link
+            href={`/accuracy/${MARKETS[code].slug}`}
+            className="text-brand hover:underline"
+          >
+            {MARKETS[code].displayName.toLowerCase()} accuracy record
+          </Link>{' '}
+          — every graded pick counted, losses included.
+        </p>
+      </div>
+    </>
+  );
 }
