@@ -13,12 +13,22 @@ import (
 // Reference data: leagues, teams, markets, packages, analysts. All of it is
 // small, slow-changing, and cacheable for an hour at the HTTP layer.
 
-// Leagues returns every active league, ordered for display.
+// Leagues returns every league the public site may show.
+//
+// Gated on is_published, matching Feed. Without that the two disagreed, and
+// the disagreement was load-bearing: the frontend builds its footer crawl
+// spine and its sitemap from this list, so a shadow-mode league got a public
+// landing page announcing "a published prediction on every upcoming fixture"
+// over a feed that returns nothing for it. A thin page linked from every page
+// on the site is a worse outcome than no page.
+//
+// This is the same rule as the paywall — the boundary is the query, not a
+// filter applied after fetching.
 func (db *DB) Leagues(ctx context.Context) ([]domain.League, error) {
 	rows, err := db.Pool.Query(ctx, `
 		SELECT id, name, short_name, country, country_code, tier, region, slug, is_active
 		FROM leagues
-		WHERE is_active
+		WHERE is_active AND is_published
 		ORDER BY tier, country, name`)
 	if err != nil {
 		return nil, fmt.Errorf("query leagues: %w", err)
@@ -211,4 +221,126 @@ func (db *DB) CoverageStats(ctx context.Context, modelVersion string) (CoverageS
 	}
 	s.ModelVersion = modelVersion
 	return s, nil
+}
+
+/* ------------------------------------------------------------------ *
+ * The publication gate
+ * ------------------------------------------------------------------ */
+
+// LeagueReadiness is one league's publication status alongside the evidence
+// for whether it deserves it.
+//
+// Upcoming/Ready are counted with the *same* predicate the publish job uses
+// (FreeTipCandidates), so the readiness figure is not a second opinion about
+// eligibility — it is a dry run of the real one. A league can be published and
+// still contribute nothing, which is exactly the state this exists to make
+// visible: without it, "no tips today" and "this league is in shadow mode"
+// look identical from outside.
+type LeagueReadiness struct {
+	ID          uuid.UUID
+	Slug        string
+	Name        string
+	Country     string
+	Region      string
+	IsActive    bool
+	IsPublished bool
+	// Upcoming scheduled fixtures, and how many clear the sample-size floor.
+	Upcoming int
+	Ready    int
+	// Teams in the league, and how many have less finished history than the
+	// floor. TeamsShort > 0 is why Ready is low.
+	Teams      int
+	TeamsShort int
+	// Fewest finished matches held by any team in the league.
+	MinPlayed int
+}
+
+// LeagueReadinessAll reports every league against the publication gate.
+//
+// minSample is model.MinHistoryPerTeam, passed in rather than imported so this
+// package keeps knowing nothing about the model.
+func (db *DB) LeagueReadinessAll(ctx context.Context, minSample int) ([]LeagueReadiness, error) {
+	rows, err := db.Pool.Query(ctx, `
+		WITH played AS (
+		    SELECT t.id AS team_id, t.league_id, count(m.id) AS matches
+		    FROM teams t
+		    LEFT JOIN matches m
+		           ON (m.home_team_id = t.id OR m.away_team_id = t.id)
+		          AND m.status = 'finished'
+		    GROUP BY t.id, t.league_id
+		),
+		team_stats AS (
+		    SELECT league_id,
+		           count(*)                                   AS teams,
+		           count(*) FILTER (WHERE matches < $1)        AS teams_short,
+		           coalesce(min(matches), 0)                   AS min_played
+		    FROM played
+		    GROUP BY league_id
+		),
+		fixture_stats AS (
+		    SELECT m.league_id,
+		           count(*) AS upcoming,
+		           count(*) FILTER (
+		               WHERE mr.sample_home >= $1 AND mr.sample_away >= $1
+		           ) AS ready
+		    FROM matches m
+		    LEFT JOIN match_reasoning mr ON mr.match_id = m.id
+		    WHERE m.status = 'scheduled' AND m.kickoff_at > now()
+		    GROUP BY m.league_id
+		)
+		SELECT l.id, l.slug, l.name, l.country, l.region, l.is_active, l.is_published,
+		       coalesce(f.upcoming, 0), coalesce(f.ready, 0),
+		       coalesce(s.teams, 0), coalesce(s.teams_short, 0), coalesce(s.min_played, 0)
+		FROM leagues l
+		LEFT JOIN team_stats    s ON s.league_id = l.id
+		LEFT JOIN fixture_stats f ON f.league_id = l.id
+		ORDER BY l.is_published DESC, coalesce(f.ready, 0) DESC, l.tier, l.country, l.name`,
+		minSample)
+	if err != nil {
+		return nil, fmt.Errorf("query league readiness: %w", err)
+	}
+	defer rows.Close()
+
+	var out []LeagueReadiness
+	for rows.Next() {
+		var r LeagueReadiness
+		if err := rows.Scan(&r.ID, &r.Slug, &r.Name, &r.Country, &r.Region,
+			&r.IsActive, &r.IsPublished, &r.Upcoming, &r.Ready,
+			&r.Teams, &r.TeamsShort, &r.MinPlayed); err != nil {
+			return nil, fmt.Errorf("scan league readiness: %w", err)
+		}
+		out = append(out, r)
+	}
+	return out, rows.Err()
+}
+
+// LeagueReadinessBySlug reports one league. Returns ErrNotFound when the slug
+// is unknown, so a typo'd slug is an error rather than a silent no-op.
+func (db *DB) LeagueReadinessBySlug(ctx context.Context, slug string, minSample int) (LeagueReadiness, error) {
+	all, err := db.LeagueReadinessAll(ctx, minSample)
+	if err != nil {
+		return LeagueReadiness{}, err
+	}
+	for _, r := range all {
+		if r.Slug == slug {
+			return r, nil
+		}
+	}
+	return LeagueReadiness{}, domain.ErrNotFound
+}
+
+// SetLeaguePublished flips the publication gate and returns whether the value
+// actually changed.
+//
+// Takes a Querier so the flip and its audit_log entry commit together: a
+// league that went live with no record of who cleared it is precisely the gap
+// this command exists to close.
+func (db *DB) SetLeaguePublished(ctx context.Context, q Querier, id uuid.UUID, published bool) (bool, error) {
+	tag, err := q.Exec(ctx, `
+		UPDATE leagues SET is_published = $2
+		WHERE id = $1 AND is_published IS DISTINCT FROM $2`, id, published)
+	if err != nil {
+		return false, fmt.Errorf("set league published: %w", err)
+	}
+	return tag.RowsAffected() > 0, nil
 }

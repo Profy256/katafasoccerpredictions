@@ -34,6 +34,9 @@ Usage:
   katafa migrate up|down|status   apply, roll back, or report schema migrations
   katafa jobs migrate             install the River job queue tables
   katafa seed leagues <file.json> load league/team reference data
+  katafa leagues list             every league against the publication gate
+  katafa leagues publish <slug>   clear a league to publish (--by, --reason)
+  katafa leagues unpublish <slug> return a league to shadow mode
   katafa backfill --csv <file>    load football-data.co.uk historical results
   katafa settle predictions       run a settlement pass now
   katafa settle slips             grade auto-gradable tips and close slips
@@ -77,6 +80,8 @@ func run() error {
 		return jobsCmd(ctx, db, args[1:])
 	case "seed":
 		return seedCmd(ctx, db, log, args[1:])
+	case "leagues":
+		return leaguesCmd(ctx, db, log, args[1:])
 	case "backfill":
 		return backfillCmd(ctx, db, log, args[1:])
 	case "settle":

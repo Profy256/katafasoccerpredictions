@@ -167,10 +167,32 @@ anyone.
    go run ./backend/cmd/katafa backfill -csv=E0.csv -league=eng-premier-league
    ```
 
-   Then publish deliberately: `UPDATE leagues SET is_published = TRUE WHERE
-   slug = 'eng-premier-league';` — there is no CLI shortcut for this on
-   purpose (see [AGENTS.md](AGENTS.md) non-negotiables — publishing is a
-   one-way door, so it isn't one flag away from an accidental default).
+   Then publish deliberately:
+
+   ```bash
+   go run ./backend/cmd/katafa leagues list
+   go run ./backend/cmd/katafa leagues publish eng-premier-league \
+     -by=you@yourdomain.com -reason="seeded 25 seasons from E0.csv"
+   ```
+
+   This used to be a hand-written `UPDATE leagues SET is_published = TRUE`,
+   on the reasoning that publishing is a one-way door and should not be one
+   flag away from an accidental default. The door is still one-way; the raw
+   UPDATE was just a bad way to guard it. It recorded no reason, no operator,
+   and — worst — checked nothing, so it could not tell you that the league you
+   were about to publish had eight matches of history.
+
+   `leagues publish` keeps the deliberateness and adds the check: `-by` must
+   resolve to a real `role = 'admin'` user, `-reason` is mandatory, both land
+   in `audit_log` alongside the sample-size evidence, and it **refuses** a
+   league where no upcoming fixture clears the `MinHistoryPerTeam` floor
+   unless you pass `-force`. `leagues list` shows every league against that
+   gate, which is also the fastest answer to "why is the site so empty?" — a
+   live league with `READY 0` publishes no tips.
+
+   `leagues unpublish` returns a league to shadow mode. It does not retract
+   anything already published: free tips are immutable, and settled history
+   stays public.
 
 ## 4. Promoting an admin/analyst user
 
