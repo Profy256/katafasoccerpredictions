@@ -22,7 +22,7 @@ export function SiteHeader({ signedIn }: { signedIn: boolean }) {
             at narrow widths, leaving the decorative mark as the only child. */}
         <Link
           href="/"
-          aria-label="Katafa home"
+          aria-label="Katafa Football Predictions home"
           className="flex shrink-0 items-center gap-2.5"
         >
           <Image
@@ -35,9 +35,15 @@ export function SiteHeader({ signedIn }: { signedIn: boolean }) {
             className="h-8 w-8 shrink-0"
           />
           {/* The mark alone carries the brand on narrow screens — the wordmark
-              is what pushes the nav off the edge at 390px. */}
-          <span className="hidden text-[15px] font-semibold tracking-tight sm:inline">
+              is what pushes the nav off the edge at 390px. "Football
+              Predictions" is part of the name, but it only earns its width
+              once the nav is comfortable, so it appears a breakpoint later. */}
+          <span className="hidden text-[15px] font-semibold leading-tight tracking-tight sm:inline">
             Katafa
+            <span className="hidden font-normal text-fg-muted lg:inline">
+              {' '}
+              Football Predictions
+            </span>
           </span>
         </Link>
 

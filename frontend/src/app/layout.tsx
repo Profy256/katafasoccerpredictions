@@ -22,14 +22,14 @@ export const metadata: Metadata = {
   // URLs, which crawlers reject.
   metadataBase: new URL(SITE_URL),
   title: {
-    default: 'Katafa — Football Predictions With Receipts',
-    template: '%s · Katafa',
+    default: 'Katafa Football Predictions — Every Pick On The Record',
+    template: '%s · Katafa Football Predictions',
   },
   description:
     'Free daily football predictions and soccer tips across Match Result (1X2), Double Chance, Both Teams To Score and Over/Under goals — plus a public, auto-graded accuracy record for every pick, wins and losses alike.',
   openGraph: {
     type: 'website',
-    siteName: 'Katafa',
+    siteName: 'Katafa Football Predictions',
     url: '/',
   },
   twitter: { card: 'summary_large_image' },
@@ -57,16 +57,22 @@ const SITE_JSON_LD = {
   '@graph': [
     {
       '@type': 'Organization',
-      name: 'Katafa',
+      '@id': `${SITE_URL}/#organization`,
+      name: 'Katafa Football Predictions',
+      alternateName: 'Katafa',
       url: SITE_URL,
       logo: `${SITE_URL}/icon.png`,
       description:
         'Football predictions platform publishing free daily statistical tips and paid analyst slips, both graded automatically against a public accuracy record.',
+      // The entity page search engines can read the publisher off.
+      mainEntityOfPage: `${SITE_URL}/about`,
     },
     {
       '@type': 'WebSite',
-      name: 'Katafa',
+      name: 'Katafa Football Predictions',
+      alternateName: 'Katafa',
       url: SITE_URL,
+      publisher: { '@id': `${SITE_URL}/#organization` },
     },
   ],
 };

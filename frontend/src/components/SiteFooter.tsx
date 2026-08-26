@@ -29,7 +29,7 @@ export async function SiteFooter() {
                 height={64}
                 className="h-6 w-6"
               />
-              Katafa
+              Katafa Football Predictions
             </p>
             <p className="mt-2 text-sm leading-relaxed text-fg-muted">
               Every prediction published here is graded against the real result
@@ -51,6 +51,9 @@ export async function SiteFooter() {
             </Link>
             <Link href="/faq" className="text-fg-muted hover:text-fg">
               FAQ
+            </Link>
+            <Link href="/about" className="text-fg-muted hover:text-fg">
+              About &amp; editorial policy
             </Link>
           </nav>
         </div>

@@ -2,7 +2,7 @@ import type { MetadataRoute } from 'next';
 
 export default function manifest(): MetadataRoute.Manifest {
   return {
-    name: 'Katafa — Football Predictions With Receipts',
+    name: 'Katafa Football Predictions',
     short_name: 'Katafa',
     description:
       'Statistically generated football predictions with a public auto-graded accuracy record for every pick.',

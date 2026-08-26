@@ -2,7 +2,7 @@ import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { ImageResponse } from 'next/og';
 
-export const alt = 'Katafa — football predictions with a public accuracy record';
+export const alt = 'Katafa Football Predictions — every pick kept on a public record';
 export const size = { width: 1200, height: 630 };
 export const contentType = 'image/png';
 
@@ -32,11 +32,11 @@ export default function OpengraphImage() {
           {/* Satori renders plain <img>; next/image has no meaning here. */}
           <img src={mark} width={168} height={168} alt="" />
           <div style={{ display: 'flex', flexDirection: 'column' }}>
-            <div style={{ fontSize: 92, fontWeight: 700, letterSpacing: -3 }}>
+            <div style={{ fontSize: 88, fontWeight: 700, letterSpacing: -3 }}>
               Katafa
             </div>
-            <div style={{ fontSize: 34, color: '#93a3b8', marginTop: 4 }}>
-              Football predictions with receipts
+            <div style={{ fontSize: 36, color: '#93a3b8', marginTop: 2 }}>
+              Football Predictions
             </div>
           </div>
         </div>
