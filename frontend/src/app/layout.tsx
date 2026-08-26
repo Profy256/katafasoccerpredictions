@@ -33,6 +33,13 @@ export const metadata: Metadata = {
     url: '/',
   },
   twitter: { card: 'summary_large_image' },
+  // HilltopAds needs the referrer to survive the hop to its ad servers —
+  // without it their dashboard cannot attribute the traffic to this site.
+  // `no-referrer-when-downgrade` sends the full URL to any https destination
+  // and drops it only when downgrading to http. It is the old browser default
+  // in name only: browsers now default to `strict-origin-when-cross-origin`,
+  // which sends the bare origin, so this has to be stated explicitly.
+  referrer: 'no-referrer-when-downgrade',
   // No blanket `alternates.canonical` here on purpose: Next merges metadata
   // shallowly from layout to page, so setting one here would apply to every
   // route that doesn't override it — telling Google that /accuracy,
