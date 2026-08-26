@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"log/slog"
 	"time"
@@ -28,10 +29,16 @@ import (
 // dependency on the 04:00 batch having finished before 05:00 arrives.
 func runOnce(ctx context.Context, deps jobs.Deps, log *slog.Logger) error {
 	now := time.Now().UTC()
+	// Every stage runs even if an earlier one failed: a provider outage
+	// must not take settlement, the free-tips freeze or payment
+	// reconciliation down with it. All collected errors are returned
+	// together so the caller still sees a non-zero exit.
+	var errs []error
 
 	// Near fixture window: catches reschedules, runs every tick.
 	if stats, err := deps.Syncer.SyncFixtures(ctx, "", now.Add(-2*time.Hour), now.AddDate(0, 0, 2)); err != nil {
-		return fmt.Errorf("sync fixtures (near): %w", err)
+		log.Error("sync fixtures (near) failed", "err", err)
+		errs = append(errs, fmt.Errorf("sync fixtures (near): %w", err))
 	} else {
 		log.Info("fixtures synced", "near", true,
 			"fetched", stats.Fetched, "created", stats.Created, "updated", stats.Updated)
@@ -41,7 +48,8 @@ func runOnce(ctx context.Context, deps jobs.Deps, log *slog.Logger) error {
 	// original once-a-day cadence.
 	if now.Hour() == 3 {
 		if stats, err := deps.Syncer.SyncFixtures(ctx, "", now.Add(-2*time.Hour), now.AddDate(0, 0, 14)); err != nil {
-			return fmt.Errorf("sync fixtures (far): %w", err)
+			log.Error("sync fixtures (far) failed", "err", err)
+			errs = append(errs, fmt.Errorf("sync fixtures (far): %w", err))
 		} else {
 			log.Info("fixtures synced", "near", false,
 				"fetched", stats.Fetched, "created", stats.Created, "updated", stats.Updated)
@@ -50,7 +58,8 @@ func runOnce(ctx context.Context, deps jobs.Deps, log *slog.Logger) error {
 
 	// Finals for matches that kicked off ≥2h ago.
 	if stats, err := deps.Syncer.SyncResults(ctx, "", now.AddDate(0, 0, -3), now.Add(-2*time.Hour)); err != nil {
-		return fmt.Errorf("sync results: %w", err)
+		log.Error("sync results failed", "err", err)
+		errs = append(errs, fmt.Errorf("sync results: %w", err))
 	} else {
 		log.Info("results synced", "fetched", stats.Fetched, "updated", stats.Updated)
 	}
@@ -59,7 +68,8 @@ func runOnce(ctx context.Context, deps jobs.Deps, log *slog.Logger) error {
 	// current model version. Safe, and deliberately more frequent than the
 	// original daily-04:00 run.
 	if stats, err := deps.Predictor.GenerateUpcoming(ctx, 48*time.Hour); err != nil {
-		return fmt.Errorf("generate predictions: %w", err)
+		log.Error("generate predictions failed", "err", err)
+		errs = append(errs, fmt.Errorf("generate predictions: %w", err))
 	} else if stats.Predictions > 0 {
 		log.Info("predictions generated", "fixtures", stats.Fixtures, "predictions", stats.Predictions)
 	}
@@ -70,9 +80,9 @@ func runOnce(ctx context.Context, deps jobs.Deps, log *slog.Logger) error {
 	if now.Hour() >= 5 {
 		day, err := deps.Publisher.PublishNextDay(ctx)
 		if err != nil {
-			return fmt.Errorf("publish free tips: %w", err)
-		}
-		if !day.IsEmpty() {
+			log.Error("publish free tips failed", "err", err)
+			errs = append(errs, fmt.Errorf("publish free tips: %w", err))
+		} else if !day.IsEmpty() {
 			log.Info("free shortlist published", "day", day.Day.Format(time.DateOnly), "tips", day.TotalTips)
 		}
 	}
@@ -81,35 +91,43 @@ func runOnce(ctx context.Context, deps jobs.Deps, log *slog.Logger) error {
 	// there is no River client here to enqueue into.
 	graded, err := deps.Settler.SettlePredictions(ctx)
 	if err != nil {
-		return fmt.Errorf("settle predictions: %w", err)
+		log.Error("settle predictions failed", "err", err)
+		errs = append(errs, fmt.Errorf("settle predictions: %w", err))
 	}
 	voided, err := deps.Settler.VoidUngradablePredictions(ctx)
 	if err != nil {
-		return fmt.Errorf("void ungradable predictions: %w", err)
+		log.Error("void ungradable predictions failed", "err", err)
+		errs = append(errs, fmt.Errorf("void ungradable predictions: %w", err))
 	}
 	if _, err := deps.Settler.SettleTips(ctx); err != nil {
-		return fmt.Errorf("settle tips: %w", err)
+		log.Error("settle tips failed", "err", err)
+		errs = append(errs, fmt.Errorf("settle tips: %w", err))
 	}
 	_, voidedSlips, err := deps.Settler.CloseSlips(ctx)
 	if err != nil {
-		return fmt.Errorf("close slips: %w", err)
-	}
-	for _, slip := range voidedSlips {
-		// Every leg on the slip was called off, so its buyers are refunded.
-		if err := deps.Payments.RefundSlip(ctx, slip.SlipID, "every selection on the slip was voided"); err != nil {
-			return fmt.Errorf("refund slip %s: %w", slip.SlipID, err)
+		log.Error("close slips failed", "err", err)
+		errs = append(errs, fmt.Errorf("close slips: %w", err))
+	} else {
+		for _, slip := range voidedSlips {
+			// Every leg on the slip was called off, so its buyers are refunded.
+			if err := deps.Payments.RefundSlip(ctx, slip.SlipID, "every selection on the slip was voided"); err != nil {
+				log.Error("refund slip failed", "slip_id", slip.SlipID, "err", err)
+				errs = append(errs, fmt.Errorf("refund slip %s: %w", slip.SlipID, err))
+			}
 		}
 	}
 	if graded+voided > 0 {
 		if err := deps.DB.RefreshRollups(ctx); err != nil {
-			return fmt.Errorf("refresh rollups: %w", err)
+			log.Error("refresh rollups failed", "err", err)
+			errs = append(errs, fmt.Errorf("refresh rollups: %w", err))
 		}
 	}
 
 	// Poll transactions stuck in flight — the guarantee that makes a lost
 	// webhook still complete the purchase.
 	if resolved, err := deps.Payments.Reconcile(ctx, 100); err != nil {
-		return fmt.Errorf("reconcile payments: %w", err)
+		log.Error("reconcile payments failed", "err", err)
+		errs = append(errs, fmt.Errorf("reconcile payments: %w", err))
 	} else if resolved > 0 {
 		log.Info("payments reconciled", "resolved", resolved)
 	}
@@ -117,19 +135,22 @@ func runOnce(ctx context.Context, deps jobs.Deps, log *slog.Logger) error {
 	// Daily housekeeping, once past 01:00 UTC.
 	if now.Hour() == 1 {
 		if deleted, err := deps.DB.DeleteExpiredSessions(ctx); err != nil {
-			return fmt.Errorf("expire sessions: %w", err)
+			log.Error("expire sessions failed", "err", err)
+			errs = append(errs, fmt.Errorf("expire sessions: %w", err))
 		} else if deleted > 0 {
 			log.Info("expired sessions removed", "count", deleted)
 		}
 		if err := deps.DB.PruneRateLimits(ctx); err != nil {
-			return fmt.Errorf("prune rate limits: %w", err)
+			log.Error("prune rate limits failed", "err", err)
+			errs = append(errs, fmt.Errorf("prune rate limits: %w", err))
 		}
 		if deleted, err := deps.DB.PrunePayloads(ctx); err != nil {
-			return fmt.Errorf("prune payloads: %w", err)
+			log.Error("prune payloads failed", "err", err)
+			errs = append(errs, fmt.Errorf("prune payloads: %w", err))
 		} else if deleted > 0 {
 			log.Info("provider payloads pruned", "count", deleted)
 		}
 	}
 
-	return nil
+	return errors.Join(errs...)
 }
