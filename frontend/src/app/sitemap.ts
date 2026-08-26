@@ -1,6 +1,7 @@
 import type { MetadataRoute } from 'next';
-import { getAnalysts, getSlips } from '@/api/client';
+import { getAnalysts, getLeagues, getSlips } from '@/api/client';
 import { MARKETS, marketHref, DEFAULT_MARKET } from '@/lib/markets';
+import { leagueSlugMap } from '@/lib/leagues';
 
 const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL ?? 'http://localhost:3000';
 
@@ -34,11 +35,21 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
       priority: 0.7,
     }));
 
-  const [analysts, openSlips, settledSlips] = await Promise.all([
+  const [analysts, openSlips, settledSlips, leagues] = await Promise.all([
     getAnalysts().catch(() => []),
     getSlips({ status: 'open' }).catch(() => []),
     getSlips({ status: 'settled', limit: 500 }).catch(() => []),
+    getLeagues().catch(() => []),
   ]);
+
+  // One landing page per competition — the same slug mapping the pages use.
+  const leagueRoutes: MetadataRoute.Sitemap = [...leagueSlugMap(leagues).keys()].map(
+    (slug) => ({
+      url: `${SITE_URL}/leagues/${slug}`,
+      changeFrequency: 'hourly',
+      priority: 0.7,
+    }),
+  );
 
   const analystRoutes: MetadataRoute.Sitemap = analysts.map((a) => ({
     url: `${SITE_URL}/analysts/${a.slug}`,
@@ -52,5 +63,11 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     priority: s.status === 'open' ? 0.6 : 0.3,
   }));
 
-  return [...staticRoutes, ...marketRoutes, ...analystRoutes, ...slipRoutes];
+  return [
+    ...staticRoutes,
+    ...marketRoutes,
+    ...leagueRoutes,
+    ...analystRoutes,
+    ...slipRoutes,
+  ];
 }

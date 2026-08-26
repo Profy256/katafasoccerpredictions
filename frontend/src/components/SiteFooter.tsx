@@ -1,7 +1,20 @@
 import Image from 'next/image';
 import Link from 'next/link';
+import { getLeagues } from '@/api/client';
+import { leagueSlugMap } from '@/lib/leagues';
 
-export function SiteFooter() {
+/**
+ * Footer navigation doubles as the site's crawl spine: every league landing
+ * page is reachable from every page on the site, which is what lets Google
+ * discover /leagues/* without waiting to trip over a fixture in that
+ * competition first. League data comes from the same cached call the pages
+ * use; if the API is down, the section simply disappears rather than taking
+ * the whole page with it.
+ */
+export async function SiteFooter() {
+  const leagues = await getLeagues().catch(() => []);
+  const leagueEntries = [...leagueSlugMap(leagues).entries()];
+
   return (
     <footer className="mt-16 border-t border-line">
       <div className="mx-auto max-w-6xl px-4 py-10 sm:px-6">
@@ -27,6 +40,9 @@ export function SiteFooter() {
             <Link href="/" className="text-fg-muted hover:text-fg">
               Predictions
             </Link>
+            <Link href="/fixtures" className="text-fg-muted hover:text-fg">
+              Fixtures
+            </Link>
             <Link href="/accuracy" className="text-fg-muted hover:text-fg">
               Accuracy record
             </Link>
@@ -38,6 +54,26 @@ export function SiteFooter() {
             </Link>
           </nav>
         </div>
+
+        {leagueEntries.length > 0 && (
+          <nav className="mt-8 border-t border-line-soft pt-6" aria-label="Leagues">
+            <p className="text-xs font-medium uppercase tracking-wider text-fg-dim">
+              Predictions by league
+            </p>
+            <ul className="mt-3 flex flex-wrap gap-x-4 gap-y-1.5 text-sm">
+              {leagueEntries.map(([slug, league]) => (
+                <li key={league.id}>
+                  <Link
+                    href={`/leagues/${slug}`}
+                    className="text-fg-muted hover:text-brand hover:underline"
+                  >
+                    {league.name} predictions
+                  </Link>
+                </li>
+              ))}
+            </ul>
+          </nav>
+        )}
 
         <p className="mt-8 border-t border-line-soft pt-6 text-xs leading-relaxed text-fg-dim">
           Predictions are statistical estimates, not advice, and carry no

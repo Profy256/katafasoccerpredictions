@@ -1,12 +1,13 @@
 import type { Metadata } from 'next';
 import { Fragment } from 'react';
 import Link from 'next/link';
-import { CONFIDENCE_BANDS, getAccuracySummary, getSettledPredictions } from '@/api/client';
+import { CONFIDENCE_BANDS, getAccuracySummary, getLeagues, getSettledPredictions } from '@/api/client';
 import { AccuracyTimeline } from '@/components/charts/AccuracyTimeline';
 import { CalibrationChart } from '@/components/charts/CalibrationChart';
 import { HitRateBars } from '@/components/charts/HitRateBars';
 import { OutcomeBadge } from '@/components/OutcomeBadge';
 import { MARKETS, outcomeLabel } from '@/lib/markets';
+import { leagueSlugMap, leagueHref } from '@/lib/leagues';
 import { settledOutcomeLabel } from '@/lib/poisson';
 import { formatCount, formatDate, formatPct, formatRate } from '@/lib/format';
 
@@ -32,10 +33,12 @@ export default async function AccuracyPage({ searchParams }: PageProps<'/accurac
   const outcome =
     rawOutcome === 'hit' || rawOutcome === 'miss' ? rawOutcome : ('all' as const);
 
-  const [accuracy, ledger] = await Promise.all([
+  const [accuracy, ledger, leagues] = await Promise.all([
     getAccuracySummary(),
     getSettledPredictions({ outcome, limit: LEDGER_LIMIT }),
+    getLeagues().catch(() => []),
   ]);
+  const leagueMap = leagueSlugMap(leagues);
 
   return (
     <div className="mx-auto max-w-6xl px-4 py-8 sm:px-6">
@@ -178,18 +181,34 @@ export default async function AccuracyPage({ searchParams }: PageProps<'/accurac
                       {group.heading}
                     </th>
                   </tr>
-                  {group.rows.map((row) => (
-                    <tr key={`${group.heading}-${row.key}`}>
-                      <td className="py-2 pr-4">{row.label}</td>
-                      <td className="py-2 pr-4 tabular-nums text-fg-muted">
-                        {formatCount(row.correct)}
-                      </td>
-                      <td className="py-2 pr-4 tabular-nums text-fg-muted">
-                        {formatCount(row.total)}
-                      </td>
-                      <td className="py-2 tabular-nums font-medium">{formatRate(row.hitRate)}</td>
-                    </tr>
-                  ))}
+                  {group.rows.map((row) => {
+                    // League rows link to the league's own landing page —
+                    // the table is also the crawl path into /leagues/*.
+                    const leagueHrefResolved =
+                      group.heading === 'League'
+                        ? leagueHref(leagueMap, row.key)
+                        : null;
+                    return (
+                      <tr key={`${group.heading}-${row.key}`}>
+                        <td className="py-2 pr-4">
+                          {leagueHrefResolved ? (
+                            <Link href={leagueHrefResolved} className="hover:text-brand hover:underline">
+                              {row.label}
+                            </Link>
+                          ) : (
+                            row.label
+                          )}
+                        </td>
+                        <td className="py-2 pr-4 tabular-nums text-fg-muted">
+                          {formatCount(row.correct)}
+                        </td>
+                        <td className="py-2 pr-4 tabular-nums text-fg-muted">
+                          {formatCount(row.total)}
+                        </td>
+                        <td className="py-2 tabular-nums font-medium">{formatRate(row.hitRate)}</td>
+                      </tr>
+                    );
+                  })}
                 </Fragment>
               ))}
             </tbody>

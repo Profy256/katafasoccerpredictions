@@ -16,9 +16,11 @@ export async function generateMetadata({
   const { id } = await params;
   const detail = await getMatchDetail(id);
   if (!detail) return { title: 'Match not found' };
+  const { homeTeam, awayTeam, league } = detail;
   return {
-    title: `${detail.homeTeam.name} vs ${detail.awayTeam.name}`,
-    description: `Model reasoning and published predictions for ${detail.homeTeam.name} versus ${detail.awayTeam.name} in the ${detail.league.name}.`,
+    title: `${homeTeam.name} vs ${awayTeam.name} Prediction`,
+    description: `Model reasoning, probabilities and published predictions for ${homeTeam.name} versus ${awayTeam.name} in the ${league.name}, graded against the result after kickoff.`,
+    alternates: { canonical: `/matches/${id}` },
   };
 }
 

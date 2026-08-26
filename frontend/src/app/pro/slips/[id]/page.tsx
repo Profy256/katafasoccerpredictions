@@ -15,7 +15,11 @@ export async function generateMetadata({
   const { id } = await params;
   const slip = await getSlip(id);
   if (!slip) return { title: 'Slip not found' };
-  return { title: `${slip.package.name} slip` };
+  return {
+    title: `${slip.package.name} slip: ${slip.title}`,
+    description: `${slip.tipCount}-selection ${slip.package.name} slip by Katafa's analysts, priced at ${formatUgx(slip.priceUgx)} and graded automatically against every result once settled.`,
+    alternates: { canonical: `/pro/slips/${id}` },
+  };
 }
 
 export default async function SlipPage({
