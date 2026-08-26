@@ -172,6 +172,56 @@ Port the selection constants verbatim — `MIN_PUBLISHABLE_ODDS = 1.25`,
 comments in the Go port. When the backend is live, `getFreeTips` becomes a
 `fetch` and the selection code is deleted from the frontend, not left to drift.
 
+### The selection window
+
+The shortlist originally covered exactly one UTC day — the next matchday with
+fixtures on it. That is right for a weekend and wrong for a Tuesday: a card of
+one fixture, capped at `MAX_APPEARANCES_PER_FIXTURE`, published **two tips**
+while a dozen priced fixtures sat 48 hours out and invisible. Readers cannot
+tell a thin window from a thin model, and a two-tip page reads as a broken
+site.
+
+`Select` therefore tries one day first — so a healthy matchday is chosen
+exactly as it always was — and only reaches forward, one day at a time, while
+the result is under `MinShortlistSize` (10, roughly two per market), stopping
+at `MaxWindowDays` (3). Beyond three days the model is pricing fixtures whose
+team news does not exist yet; a short shortlist beats a stale one.
+`tips.Day.CoversDays` records what it used, and `publish` logs any widening —
+a run of 3s means ingestion or history has dried up, not that it is midweek.
+
+### Sharing the appearance budget
+
+`MAX_APPEARANCES_PER_FIXTURE` is a budget shared by all six markets, and it
+used to be spent by filling each market to `perMarket` in turn. 1X2 took two
+slots on every fixture, Double Chance took whatever was left, and the goals
+markets got nothing: ten tips published across three markets, with Over/Under
+1.5, 2.5 and 3.5 empty. Three market pages with nothing on them, on a site
+whose pitch is that it prices six markets.
+
+The budget is handed out in rounds instead — every market takes its first pick
+before any market takes its second — so a market is empty only when it has
+nothing publishable, never because it sorts late in `domain.MarketCodes`.
+Within a round that order still decides who reaches a contested fixture first,
+so the coupling is unchanged and still asserted.
+
+Fairness stops at the odds floor. A market whose every candidate prices under
+`MIN_PUBLISHABLE_ODDS` still publishes nothing, because the alternative is
+padding the page with 1.05s — `TestSelectLeavesAMarketEmptyWhenNothingClearsTheFloor`
+pins that.
+
+Two things make this safe, and neither is optional:
+
+- **`FreeTipCandidates` excludes any prediction already in `free_tips`.**
+  Consecutive runs now see overlapping sets of scheduled fixtures, so without
+  it Tuesday would re-publish Monday's picks and one set of results would be
+  reported as two days of record. A prediction reaches the free tier once,
+  ever. `TestFreeTipCandidatesExcludeAlreadyPublishedPredictions` asserts it.
+- **The frontend dates the rows it did not publish for that day.** The heading
+  still names the matchday the shortlist was published for, because that is
+  what it is, but a bare kickoff *time* under a heading reading "Tomorrow"
+  would misdate a fixture two days out. Rows outside the headline day carry
+  their date, and the summary says how far the list runs.
+
 This also answers the question the free tier is built on: showing a user "we
 went 4 from 5 yesterday" requires a row that says what yesterday's five were,
 written before those matches kicked off.

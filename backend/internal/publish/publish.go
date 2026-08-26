@@ -57,5 +57,16 @@ func (s *Service) PublishNextDay(ctx context.Context) (tips.Day, error) {
 	}); err != nil {
 		return tips.Day{}, err
 	}
+
+	// A widened window is not an error, but it is worth seeing: one starved
+	// midweek day is normal, a run of them means fixtures or history have
+	// stopped arriving.
+	if day.CoversDays > 1 {
+		s.Log.Info("matchday too thin to fill a shortlist, window extended",
+			"day", day.Day.Format("2006-01-02"),
+			"covers_days", day.CoversDays,
+			"tips", day.TotalTips,
+			"floor", tips.MinShortlistSize)
+	}
 	return day, nil
 }

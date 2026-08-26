@@ -4,7 +4,14 @@ import { getAccuracySummary, getFreeTips, getPackages, getSlips } from '@/api/cl
 import { MARKETS, marketHref } from '@/lib/markets';
 import { shouldShowGate } from '@/lib/ads';
 import { getSeenAdGates } from '@/lib/ad-gates';
-import { formatCount, formatDayHeading, formatRate, formatUgx } from '@/lib/format';
+import {
+  formatCount,
+  formatDate,
+  formatDayHeading,
+  formatRate,
+  formatUgx,
+  utcDayKey,
+} from '@/lib/format';
 import { AdSlot } from './AdSlot';
 import { FreeTipsSection } from './FreeTipsSection';
 import { MarketAdGate } from './MarketAdGate';
@@ -32,6 +39,18 @@ export async function FreeTipsView({ market }: { market: MarketCode }) {
   ]);
 
   const group = tips.groups.find((g) => g.market === market);
+
+  // How far the shortlist actually reaches. A matchday too thin to fill six
+  // markets lets the backend's selection window extend forward, so "Tomorrow's
+  // selections — 10 tips" can describe fixtures spread over three days. The
+  // heading stays anchored on the matchday the shortlist was published for
+  // (that is what it is), and the sentence under it says the rest. Nothing is
+  // re-selected here: this only reads the kickoffs of already-frozen rows.
+  const lastKickoff = tips.groups
+    .flatMap((g) => g.tips.map((t) => t.match.kickoffAt))
+    .reduce<string | null>((latest, at) => (!latest || at > latest ? at : latest), null);
+  const spansBeyondDay =
+    lastKickoff !== null && tips.date !== '' && utcDayKey(lastKickoff) !== tips.date;
   const marketAccuracy = accuracy.byMarket.find((b) => b.key === market);
   const gated = shouldShowGate(market, seenGates);
 
@@ -47,7 +66,15 @@ export async function FreeTipsView({ market }: { market: MarketCode }) {
         </h1>
         <p className="mt-3 text-[15px] leading-relaxed text-fg-muted">
           {tips.totalTips} soccer tips — Match Result, Double Chance, Both
-          Teams To Score and Over/Under goals — free and open to everyone. No
+          Teams To Score and Over/Under goals — free and open to everyone.
+          {spansBeyondDay && lastKickoff !== null && (
+            <>
+              {' '}
+              Too few fixtures on this matchday alone to price six markets, so
+              the shortlist runs through {formatDate(lastKickoff)}.
+            </>
+          )}{' '}
+          No
           &ldquo;sure wins,&rdquo; no guarantees: every pick is graded against
           the result and the full record — currently{' '}
           {formatRate(accuracy.overall.hitRate)} across{' '}
@@ -83,7 +110,7 @@ export async function FreeTipsView({ market }: { market: MarketCode }) {
 
           <div className="mt-4">
             {group ? (
-              <FreeTipsSection group={group} />
+              <FreeTipsSection group={group} dayKey={tips.date} />
             ) : (
               <p className="rounded-xl border border-dashed border-line bg-surface/50 p-10 text-center text-sm text-fg-muted">
                 No {MARKETS[market].displayName} tips clear our publishing

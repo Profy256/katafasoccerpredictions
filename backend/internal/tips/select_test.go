@@ -220,29 +220,130 @@ func TestSelectSpendsAppearancesInMarketOrder(t *testing.T) {
 	}
 }
 
-// The shortlist covers one matchday: the next one with fixtures on it.
-func TestSelectCoversOneMatchdayOnly(t *testing.T) {
-	today := candidate(t, "today", namedUUID("m1"), domain.MarketOneXTwo, 70, kickoff1)
-	lateToday := candidate(t, "late", namedUUID("m2"), domain.MarketOneXTwo, 72, kickoff2)
+// A matchday that can fill a page is published exactly as it always was:
+// one UTC day, nothing borrowed from tomorrow.
+func TestSelectStaysOnOneMatchdayWhenItCanFillTheShortlist(t *testing.T) {
+	var candidates []Candidate
+	// Six fixtures on day 1, each priced in every market. Six fixtures at two
+	// appearances apiece is comfortably past MinShortlistSize.
+	for f := 0; f < 6; f++ {
+		match := namedUUID(fmt.Sprintf("today-match-%d", f))
+		for i, market := range domain.MarketCodes {
+			name := fmt.Sprintf("today-%d-%d", f, i)
+			candidates = append(candidates, candidate(t, name, match, market, 60+float64(f), kickoff1))
+		}
+	}
 	tomorrow := candidate(t, "tomorrow", namedUUID("m3"), domain.MarketOneXTwo, 74, kickoff3)
+	candidates = append(candidates, tomorrow)
 
-	// Deliberately out of kickoff order: the caller's ORDER BY must not be what
-	// decides the matchday.
-	day := Select([]Candidate{tomorrow, lateToday, today}, 4)
+	day := Select(candidates, 4)
 
 	if !day.Day.Equal(day1) {
 		t.Fatalf("matchday = %s, want %s", day.Day.Format(time.RFC3339), day1.Format(time.RFC3339))
 	}
-	if day.TotalTips != 2 {
-		t.Fatalf("published %d tips, want the 2 on the matchday", day.TotalTips)
+	if day.CoversDays != 1 {
+		t.Errorf("covered %d days, want 1 — a full matchday must not reach forward", day.CoversDays)
 	}
-	for _, tip := range marketTips(t, day, domain.MarketOneXTwo) {
-		if tip.PredictionID == tomorrow.Prediction.ID {
-			t.Fatal("published a fixture from the following day")
+	if day.TotalTips < MinShortlistSize {
+		t.Fatalf("published %d tips, expected at least the %d floor", day.TotalTips, MinShortlistSize)
+	}
+	for _, g := range day.Groups {
+		for _, tip := range g.Tips {
+			if tip.PredictionID == tomorrow.Prediction.ID {
+				t.Fatal("published a fixture from the following day")
+			}
 		}
 	}
 	if day2.Equal(day1) { // guards the fixtures above, not the code
 		t.Fatal("test days collapsed")
+	}
+}
+
+// The bug this replaces a test for: a midweek card of one or two fixtures
+// produced a two-tip page while a dozen fixtures sat 48 hours out, unpublished.
+// A starved matchday now reaches forward instead.
+func TestSelectExtendsWindowWhenMatchdayIsStarved(t *testing.T) {
+	var candidates []Candidate
+	// One lonely fixture on day 1 — two tips at the appearance cap, however
+	// many markets price it.
+	lonely := namedUUID("lonely-match")
+	for i, market := range domain.MarketCodes {
+		candidates = append(candidates,
+			candidate(t, fmt.Sprintf("lonely-%d", i), lonely, market, 70, kickoff1))
+	}
+	// A full card on day 2.
+	for f := 0; f < 6; f++ {
+		match := namedUUID(fmt.Sprintf("tomorrow-match-%d", f))
+		for i, market := range domain.MarketCodes {
+			name := fmt.Sprintf("tomorrow-%d-%d", f, i)
+			candidates = append(candidates, candidate(t, name, match, market, 60+float64(f), kickoff3))
+		}
+	}
+
+	day := Select(candidates, 4)
+
+	if !day.Day.Equal(day1) {
+		t.Fatalf("matchday = %s, want the first day with fixtures (%s)",
+			day.Day.Format(time.RFC3339), day1.Format(time.RFC3339))
+	}
+	if day.CoversDays != 2 {
+		t.Errorf("covered %d days, want 2 — one starved day should reach exactly one day forward",
+			day.CoversDays)
+	}
+	if day.TotalTips < MinShortlistSize {
+		t.Fatalf("published %d tips, want at least the %d floor once the window widened",
+			day.TotalTips, MinShortlistSize)
+	}
+	// The lonely fixture is still in: widening adds candidates, it does not
+	// replace the matchday.
+	found := false
+	for _, g := range day.Groups {
+		for _, tip := range g.Tips {
+			if tip.MatchID == lonely {
+				found = true
+			}
+		}
+	}
+	if !found {
+		t.Error("the matchday's own fixture dropped out when the window widened")
+	}
+}
+
+// Better a short shortlist than a stale one: the window stops at
+// MaxWindowDays even when it still has not filled the page.
+func TestSelectStopsAtMaxWindowDays(t *testing.T) {
+	// One fixture per day for a week: every window is starved, so the loop
+	// runs to its cap.
+	var candidates []Candidate
+	for d := 0; d < 7; d++ {
+		match := namedUUID(fmt.Sprintf("day-%d-match", d))
+		kickoff := kickoff1.AddDate(0, 0, d)
+		for i, market := range domain.MarketCodes {
+			candidates = append(candidates,
+				candidate(t, fmt.Sprintf("d%d-%d", d, i), match, market, 70, kickoff))
+		}
+	}
+
+	day := Select(candidates, 4)
+
+	if day.CoversDays != MaxWindowDays {
+		t.Fatalf("covered %d days, want the %d cap", day.CoversDays, MaxWindowDays)
+	}
+	if day.TotalTips >= MinShortlistSize {
+		t.Fatalf("published %d tips; this fixture set cannot reach the %d floor, "+
+			"so the test is no longer exercising the cap", day.TotalTips, MinShortlistSize)
+	}
+	// Nothing beyond the cap leaked in.
+	limit := day1.AddDate(0, 0, MaxWindowDays)
+	for _, g := range day.Groups {
+		for _, tip := range g.Tips {
+			for _, c := range candidates {
+				if c.Prediction.ID == tip.PredictionID && !c.KickoffAt.Before(limit) {
+					t.Fatalf("published a fixture kicking off %s, past the %s window limit",
+						c.KickoffAt.Format(time.RFC3339), limit.Format(time.RFC3339))
+				}
+			}
+		}
 	}
 }
 
@@ -258,6 +359,102 @@ func TestSelectEmptyWhenNoCandidates(t *testing.T) {
 	}
 	if len(day.Groups) != 0 {
 		t.Fatalf("empty input produced %d groups", len(day.Groups))
+	}
+}
+
+// The bug: the shared appearance budget was spent by filling each market to
+// perMarket in turn, so 1X2 and Double Chance claimed two slots on every
+// fixture and the three goals markets published nothing at all. Every market
+// with something publishable must get a pick before any market gets a second.
+func TestSelectGivesEveryMarketATipBeforeAnyMarketGetsSeconds(t *testing.T) {
+	// Five fixtures, every market priced on each — deliberately fewer
+	// fixture-slots (5 x 2 = 10) than six markets filling four tips each (24),
+	// which is exactly the shape that starved the late markets.
+	var candidates []Candidate
+	for f := 0; f < 5; f++ {
+		match := namedUUID(fmt.Sprintf("m-%d", f))
+		for i, market := range domain.MarketCodes {
+			// Confidence varies by market so the ladder has real choices and
+			// the markets are not tied.
+			conf := 55 + float64(f)*3 + float64(i)
+			candidates = append(candidates,
+				candidate(t, fmt.Sprintf("f%d-m%d", f, i), match, market, conf, kickoff1))
+		}
+	}
+
+	day := Select(candidates, 4)
+
+	got := make(map[domain.MarketCode]int, len(domain.MarketCodes))
+	for _, g := range day.Groups {
+		got[g.Market] = len(g.Tips)
+	}
+	for _, market := range domain.MarketCodes {
+		if got[market] == 0 {
+			t.Errorf("%s published nothing while the shortlist ran to %d tips; "+
+				"it had a candidate on every fixture", market, day.TotalTips)
+		}
+	}
+
+	// Nobody may take a second while somebody publishable is still on zero.
+	// With every market non-empty above, the check that matters is the spread:
+	// no market should be more than one ahead of the smallest.
+	minTips, maxTips := -1, 0
+	for _, market := range domain.MarketCodes {
+		n := got[market]
+		if minTips == -1 || n < minTips {
+			minTips = n
+		}
+		if n > maxTips {
+			maxTips = n
+		}
+	}
+	if maxTips-minTips > 1 {
+		t.Errorf("tips per market ranged %d..%d; round-robin should keep them within one",
+			minTips, maxTips)
+	}
+
+	// The appearance cap is still the cap — fairness must not be bought by
+	// letting one fixture carry the whole page.
+	perFixture := make(map[uuid.UUID]int)
+	for _, g := range day.Groups {
+		for _, tip := range g.Tips {
+			perFixture[tip.MatchID]++
+		}
+	}
+	for match, n := range perFixture {
+		if n > MaxAppearancesPerFixture {
+			t.Errorf("fixture %s appeared %d times, cap is %d", match, n, MaxAppearancesPerFixture)
+		}
+	}
+}
+
+// Fairness must not manufacture tips: a market whose every candidate fails the
+// odds floor stays empty, because the alternative is publishing a 1.05.
+func TestSelectLeavesAMarketEmptyWhenNothingClearsTheFloor(t *testing.T) {
+	var candidates []Candidate
+	for f := 0; f < 5; f++ {
+		match := namedUUID(fmt.Sprintf("m-%d", f))
+		for _, market := range domain.MarketCodes {
+			conf := 60.0
+			// Over 3.5 is priced so high that its odds fall under the floor.
+			if market == domain.MarketOverUnder35 {
+				conf = 99
+			}
+			candidates = append(candidates,
+				candidate(t, fmt.Sprintf("f%d-%s", f, market), match, market, conf, kickoff1))
+		}
+	}
+
+	day := Select(candidates, 4)
+
+	for _, g := range day.Groups {
+		if g.Market == domain.MarketOverUnder35 {
+			t.Fatalf("published %d %s tips below the %s odds floor",
+				len(g.Tips), g.Market, MinPublishableOdds)
+		}
+	}
+	if day.TotalTips == 0 {
+		t.Fatal("the other five markets published nothing either; the fixture set is wrong")
 	}
 }
 

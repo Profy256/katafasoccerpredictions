@@ -1,7 +1,8 @@
 import Link from 'next/link';
 import type { FreeTipGroup } from '@/api/types';
 import { MARKETS, outcomeLabel } from '@/lib/markets';
-import { formatOdds, formatTime } from '@/lib/format';
+import { formatDate, formatOdds, formatTime, utcDayKey } from '@/lib/format';
+import { matchHref } from '@/lib/matches';
 import { LeagueChip } from './LeagueChip';
 
 /**
@@ -10,8 +11,20 @@ import { LeagueChip } from './LeagueChip';
  * Odds shown are indicative — derived from the model's own price with a
  * typical margin applied, not scraped from any bookmaker. They exist so a
  * reader can judge whether a pick is worth taking, and are labelled as such.
+ *
+ * `dayKey` is the matchday the shortlist is headlined as. A starved matchday
+ * lets the selection window reach forward (tips.MaxWindowDays on the backend),
+ * so a row here is not necessarily playing on that day — and a bare kickoff
+ * *time* under a heading that says "Tomorrow" would quietly misdate it. Rows
+ * outside the headline day carry their date.
  */
-export function FreeTipsSection({ group }: { group: FreeTipGroup }) {
+export function FreeTipsSection({
+  group,
+  dayKey,
+}: {
+  group: FreeTipGroup;
+  dayKey?: string;
+}) {
   const market = MARKETS[group.market];
 
   return (
@@ -27,7 +40,7 @@ export function FreeTipsSection({ group }: { group: FreeTipGroup }) {
         {group.tips.map(({ match, league, homeTeam, awayTeam, prediction, odds }) => (
           <li key={prediction.id}>
             <Link
-              href={`/matches/${match.id}`}
+              href={matchHref(homeTeam, awayTeam, match.id)}
               className="group grid gap-3 px-4 py-3 transition-colors hover:bg-surface-hi/50 sm:grid-cols-[1fr_auto] sm:items-center"
             >
               <div className="min-w-0">
@@ -38,7 +51,11 @@ export function FreeTipsSection({ group }: { group: FreeTipGroup }) {
                   </p>
                 </div>
                 <p className="mt-1 text-xs text-fg-dim">
-                  {league.name} · {formatTime(match.kickoffAt)} UTC
+                  {league.name} ·{' '}
+                  {dayKey && utcDayKey(match.kickoffAt) !== dayKey
+                    ? `${formatDate(match.kickoffAt)}, `
+                    : ''}
+                  {formatTime(match.kickoffAt)} UTC
                 </p>
               </div>
 

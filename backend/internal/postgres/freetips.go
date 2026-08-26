@@ -257,8 +257,19 @@ func (db *DB) freeTipGroups(ctx context.Context, from, to time.Time) (
 //
 // Eligibility is decided here, not in tips.Select, which is pure: scheduled
 // fixtures only (never in_play — a "tip" on a match already underway is not a
-// tip), from published leagues only, at one model version, and only where the
-// reasoning snapshot shows enough history for the pick to be publishable.
+// tip), from published leagues only, at one model version, only where the
+// reasoning snapshot shows enough history for the pick to be publishable, and
+// only if the prediction has never been published to the free tier before.
+//
+// That last clause is what makes tips.MaxWindowDays safe. The selection window
+// reaches past the immediate matchday when a day is starved, so consecutive
+// runs see an overlapping set of scheduled fixtures. Without this, Tuesday's
+// shortlist would happily re-publish Monday's picks, and "Monday went 4 from
+// 5, Tuesday went 4 from 5" would be one set of five results reported twice.
+// A prediction reaches the free tier once, ever.
+//
+// It cannot suppress anything already published either: free_tips is immutable
+// and this only ever removes rows from the *candidate* set.
 func (db *DB) FreeTipCandidates(ctx context.Context, q Querier, modelVersion string, minSample int) ([]tips.Candidate, error) {
 	rows, err := q.Query(ctx, `
 		SELECT p.id, p.match_id, p.market_code, p.prediction_value,
@@ -275,6 +286,9 @@ func (db *DB) FreeTipCandidates(ctx context.Context, q Querier, modelVersion str
 		  AND p.model_version = $1
 		  AND mr.sample_home >= $2
 		  AND mr.sample_away >= $2
+		  AND NOT EXISTS (
+		      SELECT 1 FROM free_tips ft WHERE ft.prediction_id = p.id
+		  )
 		ORDER BY m.kickoff_at, p.id`, modelVersion, minSample)
 	if err != nil {
 		return nil, fmt.Errorf("query free tip candidates: %w", err)
