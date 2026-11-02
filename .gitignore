@@ -57,3 +57,6 @@ backend/bin/
 
 # transient staging dir used by backend/tools/parity/generate.sh
 .parity-stage.*
+
+# Local Netlify folder
+.netlify
